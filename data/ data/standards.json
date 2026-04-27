@@ -1,0 +1,20 @@
+{
+  "nasolabial_angle": {
+    "description": "The angle between the base of the nose and the upper lip",
+    "min_ideal": 90.0,
+    "max_ideal": 110.0,
+    "unit": "degrees",
+    "reference": "Arnett & Bergman"
+  },
+  "ricketts_e_line": {
+    "description": "Lower lip position relative to Ricketts E-Line",
+    "ideal_distance_mm": -2.0,
+    "tolerance": 1.0,
+    "reference": "Robert Ricketts"
+  },
+  "facial_proportions": {
+    "rule_of_thirds": 0.33,
+    "ideal_ratio": 1.618,
+    "note": "Golden Ratio for facial harmony"
+  }
+}
