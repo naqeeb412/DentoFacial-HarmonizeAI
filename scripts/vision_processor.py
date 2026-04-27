@@ -6,21 +6,30 @@ class FacialVisionEngine:
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             static_image_mode=True,
-            max_num_faces=1,
             refine_landmarks=True
         )
+        # تعريف أرقام النقاط التشريحية حسب معايير MediaPipe
+        self.LANDMARKS = {
+            'NOSE_TIP': 1,        # Pronasale
+            'SUBNASALE': 164,     # Subnasale
+            'UPPER_LIP': 0,       # Labrale Superius
+            'LOWER_LIP': 17,      # Labrale Inferius
+            'CHIN': 152           # Pogonion
+        }
 
-    def extract_landmarks(self, image_path):
-        """استخراج نقاط الوجه التشريحية من الصورة"""
+    def get_ortho_points(self, image_path):
+        """استخراج الإحداثيات الدقيقة للنقاط الطبية"""
         image = cv2.imread(image_path)
-        if image is None:
-            return "Error: Image not found."
-            
         results = self.face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         
+        points = {}
         if results.multi_face_landmarks:
-            # هنا سنقوم ببرمجة النقاط المحددة (E-line, Nasolabial) في الخطوة القادمة
-            return results.multi_face_landmarks[0]
-        return None
-
-# سيتم ربط هذا الكود غداً بملف القياسات الرياضية
+            mesh = results.multi_face_landmarks[0]
+            h, w, _ = image.shape
+            
+            for name, idx in self.LANDMARKS.items():
+                landmark = mesh.landmark[idx]
+                # تحويل الإحداثيات من نسبية إلى بكسل حقيقي
+                points[name] = (int(landmark.x * w), int(landmark.y * h))
+        
+        return points
