@@ -1,25 +1,22 @@
+import json
 import os
 
-# Define the path to the patient data
+# 1. Load Aesthetic Rules from JSON
+def load_rules():
+    with open('Aesthetic_Rules.json', 'r') as f:
+        return json.load(f)
+
+# 2. Link with Patient Data
 PATIENT_ID = "patient_001"
-DATA_PATH = f"data/cases/{PATIENT_ID}/"
+rules = load_rules()
 
-def load_patient_images(path):
-    """Function to scan the directory for clinical images."""
-    if os.path.exists(path):
-        files = os.listdir(path)
-        images = [f for f in files if f.endswith(('.jpg', '.jpeg', '.png'))]
-        return images
-    return []
+print(f"--- DentoFacial-HarmonizeAI System ---")
+print(f"Target Patient: {PATIENT_ID}")
+print(f"Reference Standard: Ricketts E-Line is {rules['e_line_ricketts']['lower_lip_to_eline']} mm")
 
-# Execute Loading
-found_images = load_patient_images(DATA_PATH)
-
-print(f"--- DentoFacial-HarmonizeAI ---")
-print(f"Processing Data for: {PATIENT_ID}")
-print(f"Found {len(found_images)} images for analysis: {found_images}")
-
-if len(found_images) > 0:
-    print("Status: Ready for Landmark Detection.")
+# Simulate a diagnostic check
+clinical_measure = -5 # Example measurement from a photo
+if clinical_measure < rules['e_line_ricketts']['lower_lip_to_eline']:
+    print("Diagnosis: Lower lip is retruded relative to E-Line.")
 else:
-    print("Status: Waiting for clinical images...")
+    print("Diagnosis: Lower lip position is within normal/protruded limits.")
