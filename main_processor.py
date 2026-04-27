@@ -1,32 +1,38 @@
+from scripts.vision_processor import FacialVisionEngine
+from scripts.analysis_logic import DentoFacialEngine
 import json
-import os
 
-# 1. Load Aesthetic Rules from JSON
-def load_rules():
-    try:
-        with open('Aesthetic_Rules.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print("Error: Aesthetic_Rules.json not found.")
-        return None
-
-# 2. Setup Patient Data
-PATIENT_ID = "patient_001"
-rules = load_rules()
-
-if rules:
-    print(f"--- DentoFacial-HarmonizeAI System ---")
-    print(f"Target Patient: {PATIENT_ID}")
+def run_harmonize_ai_pipeline():
+    print("🚀 Starting DentoFacial-HarmonizeAI Integrated Pipeline...")
     
-    # Example of using the rules (E-Line for Ricketts)
-    ideal_lower_lip = rules['e_line_ricketts']['lower_lip_to_eline']
-    print(f"Clinical Standard: Lower lip should be around {ideal_lower_lip} mm to E-Line.")
-
-    # Simulated clinical measurement for Patient 001
-    clinical_measure = -5 
+    # 1. تهيئة المحركات
+    vision_unit = FacialVisionEngine()
+    analysis_unit = DentoFacialEngine(patient_id="CASE_YEM_2026_01")
     
-    print(f"Current Measurement: {clinical_measure} mm")
-    if clinical_measure < ideal_lower_lip:
-        print("Diagnosis: Lower lip is retruded.")
+    # 2. استخراج النقاط التشريحية من الصورة آلياً
+    image_path = 'images/patient_test.jpg'
+    print(f"📸 Processing image: {image_path}")
+    
+    medical_points = vision_unit.get_ortho_points(image_path)
+    
+    if medical_points:
+        print("✅ Landmarks detected successfully.")
+        
+        # 3. إرسال النقاط لمحرك الحسابات (الزاوية الأنفية الشفوية مثلاً)
+        # ملاحظة: سنستخدم النقاط المستخرجة (Nose, Subnasale, Upper Lip)
+        analysis_unit.analyze_profile(
+            n_tip=medical_points['NOSE_TIP'],
+            sn=medical_points['SUBNASALE'],
+            ul=medical_points['UPPER_LIP'],
+            ll=medical_points['LOWER_LIP'],
+            pg=medical_points['CHIN']
+        )
+        
+        # 4. توليد التقرير النهائي
+        print("\n--- 📄 FINAL CLINICAL REPORT ---")
+        analysis_unit.generate_report()
     else:
-        print("Diagnosis: Lower lip position is within normal range.")
+        print("❌ Failed to detect landmarks. Please check image quality.")
+
+if __name__ == "__main__":
+    run_harmonize_ai_pipeline()
