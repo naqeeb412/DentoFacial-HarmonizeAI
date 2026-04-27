@@ -1,4 +1,4 @@
-# DentoFacial-HarmonizeAI
+# DentoFacial-HarmonizeAI: AI-Powered Interdisciplinary Synergy in Aesthetic Dentistry
 ​"Integrating AI to achieve perfect synergy between dental aesthetics and facial harmony. Leveraging advanced diagnostic measurements and data analysis to optimize treatment outcomes in aesthetic dentistry."
 # DentoFacial-HarmonizeAI
 
