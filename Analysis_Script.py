@@ -34,13 +34,27 @@ def check_eline_status(lower_lip_x, e_line_x):
         return "Ideal Aesthetic Harmony"
     else:
         return "Protruded (Potential Orthodontic case)"
+def get_nasolabial_diagnosis(angle):
+    """
+    تصنيف الزاوية بناءً على المعايير الجمالية المعتمدة (90-110 درجة).
+    """
+    if angle < 90:
+        return "Acute (Possible Maxillary Protrusion)"
+    elif 90 <= angle <= 110:
+        return "Ideal Aesthetic Harmony"
+    else:
+        return "Obtuse (Possible Maxillary Retrusion)"
+
 
 # --- اختبار المحرك الافتراضي (Simulation) ---
 print("--- DentoFacial-HarmonizeAI Diagnostics ---")
 
-# نقاط تجريبية للمريض (سيتم استخراجها لاحقاً بواسطة AI من الصورة)
+# 1. حساب الزاوية وإعطاء التشخيص (الأسطر 52-54)
 test_angle = calculate_nasolabial_angle((10, 50), (10, 10), (50, 10))
-test_eline = check_eline_status(45, 50)
+test_diag = get_nasolabial_diagnosis(test_angle) 
 
+# 2. طباعة النتائج (الأسطر 56-58)
 print(f"Computed Nasolabial Angle: {test_angle} degrees")
-print(f"Ricketts E-Line Analysis: {test_eline}")
+print(f"Clinical Diagnosis: {test_diag}")
+print(f"Ricketts E-Line Analysis: {check_eline_status(45, 50)}")
+
