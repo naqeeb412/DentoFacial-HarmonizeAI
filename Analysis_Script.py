@@ -1,4 +1,6 @@
 import math
+import cv2
+import mediapipe as mp
 
 # DentoFacial-HarmonizeAI: Core Analysis Engine
 # Focus: Interdisciplinary Synergy (Orthodontics & Aesthetics)
@@ -44,7 +46,46 @@ def get_nasolabial_diagnosis(angle):
         return "Ideal Aesthetic Harmony"
     else:
         return "Obtuse (Possible Maxillary Retrusion)"
+def calculate_skeletal_analysis(s, n, a, b):
+    """
+    تحليل علاقة الفكين عظمياً (SNA, SNB, ANB).
+    """
+    def get_angle(p1, p2, p3):
+        # حساب الزاوية بين ثلاث نقاط باستخدام المتجهات
+        v1 = (p1[0] - p2[0], p1[1] - p2[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        angle = math.degrees(math.atan2(v1[1], v1[0]) - math.atan2(v2[1], v2[0]))
+        return abs(round(angle, 2))
 
+    sna = get_angle(s, n, a)
+    snb = get_angle(s, n, b)
+    anb = round(sna - snb, 2)
+    
+    # تصنيف الحالة العظمية (Skeletal Class)
+    if 2 <= anb <= 4:
+        s_class = "Class I (Normal)"
+    elif anb > 4:
+        s_class = "Class II (Maxillary Protrusion)"
+    else:
+        s_class = "Class III (Mandibular Protrusion)"
+        
+    return sna, snb, anb, s_class
+
+def extract_face_landmarks(image_path):
+    """
+    استخراج نقاط الوجه التشريحية باستخدام MediaPipe Face Mesh.
+    """
+    mp_face_mesh = mp.solutions.face_mesh
+    with mp_face_mesh.FaceMesh(static_image_mode=True) as face_mesh:
+        image = cv2.imread(image_path)
+        results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        
+        if not results.multi_face_landmarks:
+            return None
+        
+        # استخراج النقاط (هنا نحدد أرقام النقاط الخاصة بالأنف والشفاه)
+        landmarks = results.multi_face_landmarks[0].landmark
+        return landmarks
 
 # --- اختبار المحرك الافتراضي (Simulation) ---
 print("--- DentoFacial-HarmonizeAI Diagnostics ---")
@@ -58,3 +99,77 @@ print(f"Computed Nasolabial Angle: {test_angle} degrees")
 print(f"Clinical Diagnosis: {test_diag}")
 print(f"Ricketts E-Line Analysis: {check_eline_status(45, 50)}")
 
+# 3. التحليل العظمي (Skeletal Analysis Simulation)
+# نقاط افتراضية للمحاكاة: S(10,10), N(50,10), A(45,30), B(40,50)
+sna, snb, anb, s_class = calculate_skeletal_analysis((10, 10), (50, 10), (45, 30), (40, 50))
+
+print(f"--- Skeletal Analysis (HarmonizeAI) ---")
+print(f"SNA Angle: {sna} degrees | SNB Angle: {snb} degrees")
+print(f"ANB Angle: {anb} degrees")
+print(f"Skeletal Classification: {s_class}")
+def generate_aesthetic_report(patient_name, naso_angle, e_line, skeletal_class):
+    """
+    إنشاء تقرير نهائي احترافي للمريض.
+    """
+    report = f"""
+    ==========================================
+    DentoFacial-HarmonizeAI: Clinical Report
+    ==========================================
+    Patient Name: {patient_name}
+    Date: 2026-05-11
+    
+    1. Soft Tissue Analysis:
+       - Nasolabial Angle: {naso_angle} degrees
+       - Ricketts E-Line: {e_line}
+       
+    2. Skeletal Classification:
+       - Result: {skeletal_class}
+    
+    Recommendation: Please consult with your orthodontist 
+    for the final treatment plan.
+    ==========================================
+    """
+    return report
+# تجربة إنشاء التقرير النهائي
+final_report = generate_aesthetic_report("Test Patient", test_angle, "Ideal", s_class)
+print(final_report)
+def run_automatic_analysis(image_path):
+    # 1. استخراج النقاط من الصورة
+    landmarks = extract_face_landmarks(image_path)
+    if landmarks:
+        # تحويل إحداثيات MediaPipe لنقاط يمكن حسابها
+        # ملاحظة: نستخدم z للعمق في البروفايل الجانبي
+        n_tip = (landmarks[4].x, landmarks[4].y)
+        sn = (landmarks[164].x, landmarks[164].y)
+        u_lip = (landmarks[0].x, landmarks[0].y)
+        
+        # 2. حساب زاوية الأنف والشفاه تلقائياً
+        angle = calculate_nasolabial_angle(n_tip, sn, u_lip)
+        diagnosis = get_nasolabial_diagnosis(angle)
+        
+        # 3. طباعة التقرير النهائي
+        report = generate_aesthetic_report("Patient_001", angle, "Analyzed", "Pending Skeletal")
+        print(report)
+    else:
+        print("Error: Could not detect face in image.")
+
+# لتشغيل البرنامج على صورة حقيقية (قم بتغيير اسم الصورة لصورتك)
+ run_automatic_analysis("patient_profile.jpg")
+def analyze_real_patient(image_path):
+    # 1. التعرف على الوجه ونقاطه
+    landmarks = extract_face_landmarks(image_path)
+    if landmarks:
+        # 2. تحديد النقاط التشريحية (MediaPipe Indices)
+        # 4: Nose Tip, 164: Subnasale, 0: Upper Lip
+        nose = (landmarks[4].x * 100, landmarks[4].y * 100)
+        sn = (landmarks[164].x * 100, landmarks[164].y * 100)
+        ul = (landmarks[0].x * 100, landmarks[0].y * 100)
+        
+        # 3. تشغيل المحرك الحسابي
+        angle = calculate_nasolabial_angle(nose, sn, ul)
+        diag = get_nasolabial_diagnosis(angle)
+        
+        # 4. طباعة التقرير
+        print(generate_aesthetic_report("Patient Ali", angle, "Analyzed", "Pending"))
+    else:
+        print("Could not find face landmarks in image.")
