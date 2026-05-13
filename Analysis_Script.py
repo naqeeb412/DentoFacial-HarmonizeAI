@@ -166,7 +166,7 @@ def run_automatic_analysis(image_path):
         print("Error: Could not detect face in image.")
 
 # لتشغيل البرنامج على صورة حقيقية (قم بتغيير اسم الصورة لصورتك)
- run_automatic_analysis("patient_profile.jpg")
+ run_automatic_analysis(patient_profile1.jpg)
 def analyze_real_patient():
     """
     دالة HarmonizeAI الموحدة للتحليل السريري.
