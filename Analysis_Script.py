@@ -1,3 +1,15 @@
+# التسميات الجديدة المعتمدة في HarmonizeAI
+LATERAL_FILE = "1.jpg" 
+PROFILE_FILE = "patient_profile1.jpg"
+
+def get_image_path(filename):
+    # الكود سيبحث الآن عن الصورة 1 داخل مجلد المشروع
+    import os
+    # تأكد من تعريف PROJECT_DATA_DIR أو استبداله بالمسار المباشر
+    PROJECT_DATA_DIR = "/content/drive/MyDrive/HarmonizeAI/" 
+    potential_path = os.path.join(PROJECT_DATA_DIR, filename)
+    return potential_path
+
 import math
 import cv2
 import mediapipe as mp
