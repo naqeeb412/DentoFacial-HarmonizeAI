@@ -167,13 +167,13 @@ def run_automatic_analysis(image_path):
 
 # لتشغيل البرنامج على صورة حقيقية (قم بتغيير اسم الصورة لصورتك)
  run_automatic_analysis("patient_profile.jpg")
-def def analyze_real_patient():
+def analyze_real_patient():
     """
-    دالة التحليل السريري الموحدة لمشروع HarmonizeAI.
-    تقوم بجلب الصورة '1.jpg' تلقائياً وإجراء الفحص السيفالومتري.
+    دالة HarmonizeAI الموحدة للتحليل السريري.
+    تتعرف تلقائياً على الصورة '1.jpg' وتجري الفحص السيفالومتري.
     """
     try:
-        # 1. جلب المسار الصحيح باستخدام الثوابت والدالة التي أضفتها
+        # 1. جلب المسار الصحيح باستخدام الثوابت
         lateral_path = get_image_path(LATERAL_FILE)
         
         # 2. استخراج النقاط التشريحية من الصورة الجانبية رقم 1
@@ -181,41 +181,33 @@ def def analyze_real_patient():
         
         if landmarks:
             # 3. حساب الزاوية الأنفية الشفوية (Nasolabial Angle)
-            # نمرر النقاط المستخرجة من MediaPipe
             angle = calculate_nasolabial_angle(
                 landmarks['nose_tip'], 
                 landmarks['subnasale'], 
                 landmarks['upper_lip']
             )
             
-            # 4. استخراج التشخيص السريري بناءً على القيمة الرقمية
+            # 4. استخراج التشخيص السريري
             diagnosis = get_nasolabial_diagnosis(angle)
             
+            # 5. طباعة التقرير النهائي لرسالة الماجستير
             print(f"✅ Analysis Complete for Image: {LATERAL_FILE}")
             print(f"📊 Measured Angle: {angle}°")
             print(f"🩺 Clinical Diagnosis: {diagnosis}")
             
+            # توليد التقرير الجمالي المنسق
+            report = generate_aesthetic_report("Patient Ali", angle, diagnosis)
+            print(report)
+            
             return angle, diagnosis
         else:
-            return "Error: Could not detect landmarks on image '1.jpg'"
+            print(f"❌ Error: Could not detect landmarks on image '{LATERAL_FILE}'")
+            return None
             
     except Exception as e:
-        return f"An error occurred during clinical analysis: {str(e)}"
-(image_path):
-    # 1. التعرف على الوجه ونقاطه
-    landmarks = extract_face_landmarks(image_path)
-    if landmarks:
-        # 2. تحديد النقاط التشريحية (MediaPipe Indices)
-        # 4: Nose Tip, 164: Subnasale, 0: Upper Lip
-        nose = (landmarks[4].x * 100, landmarks[4].y * 100)
-        sn = (landmarks[164].x * 100, landmarks[164].y * 100)
-        ul = (landmarks[0].x * 100, landmarks[0].y * 100)
-        
-        # 3. تشغيل المحرك الحسابي
-        angle = calculate_nasolabial_angle(nose, sn, ul)
-        diag = get_nasolabial_diagnosis(angle)
-        
-        # 4. طباعة التقرير
-        print(generate_aesthetic_report("Patient Ali", angle, "Analyzed", "Pending"))
-    else:
-        print("Could not find face landmarks in image.")
+        print(f"❌ An error occurred during clinical analysis: {str(e)}")
+        return None
+
+# السطر الأخير لتشغيل البرنامج (اختياري)
+if __name__ == "__main__":
+    analyze_real_patient()
