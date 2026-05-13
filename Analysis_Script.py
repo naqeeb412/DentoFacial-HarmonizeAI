@@ -167,7 +167,41 @@ def run_automatic_analysis(image_path):
 
 # لتشغيل البرنامج على صورة حقيقية (قم بتغيير اسم الصورة لصورتك)
  run_automatic_analysis("patient_profile.jpg")
-def analyze_real_patient(image_path):
+def def analyze_real_patient():
+    """
+    دالة التحليل السريري الموحدة لمشروع HarmonizeAI.
+    تقوم بجلب الصورة '1.jpg' تلقائياً وإجراء الفحص السيفالومتري.
+    """
+    try:
+        # 1. جلب المسار الصحيح باستخدام الثوابت والدالة التي أضفتها
+        lateral_path = get_image_path(LATERAL_FILE)
+        
+        # 2. استخراج النقاط التشريحية من الصورة الجانبية رقم 1
+        landmarks = extract_face_landmarks(lateral_path)
+        
+        if landmarks:
+            # 3. حساب الزاوية الأنفية الشفوية (Nasolabial Angle)
+            # نمرر النقاط المستخرجة من MediaPipe
+            angle = calculate_nasolabial_angle(
+                landmarks['nose_tip'], 
+                landmarks['subnasale'], 
+                landmarks['upper_lip']
+            )
+            
+            # 4. استخراج التشخيص السريري بناءً على القيمة الرقمية
+            diagnosis = get_nasolabial_diagnosis(angle)
+            
+            print(f"✅ Analysis Complete for Image: {LATERAL_FILE}")
+            print(f"📊 Measured Angle: {angle}°")
+            print(f"🩺 Clinical Diagnosis: {diagnosis}")
+            
+            return angle, diagnosis
+        else:
+            return "Error: Could not detect landmarks on image '1.jpg'"
+            
+    except Exception as e:
+        return f"An error occurred during clinical analysis: {str(e)}"
+(image_path):
     # 1. التعرف على الوجه ونقاطه
     landmarks = extract_face_landmarks(image_path)
     if landmarks:
