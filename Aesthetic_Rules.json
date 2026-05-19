@@ -1,0 +1,25 @@
+{
+  "project_name": "HarmonizeAI",
+  "academic_purpose": "Master's Degree in Aesthetic Dentistry and Facial Harmony",
+  "author": "Dr. Ali Al-Naqeeb",
+  "clinical_standards": {
+    "nasolabial_angle": {
+      "ideal_male_range": [90, 95],
+      "ideal_female_range": [100, 105],
+      "unit": "degrees",
+      "clinical_significance": "Determines upper lip profile and tooth display position"
+    },
+    "ricketts_e_line": {
+      "upper_lip_distance": -4.0,
+      "lower_lip_distance": -2.0,
+      "unit": "millimeters",
+      "clinical_significance": "Esthetic line from pronasale to pogonion for profile harmony"
+    },
+    "golden_proportion": {
+      "central_incisor": 1.618,
+      "lateral_incisor": 1.0,
+      "canine": 0.618,
+      "clinical_significance": "Apparent width ratio of maxillary anterior teeth from frontal view"
+    }
+  }
+}
