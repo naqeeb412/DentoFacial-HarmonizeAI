@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HarmonizeAI Pro - Clinical Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="master-patient-file" class="main-container">
+        
+        <div class="main-header">
+            <h2>الملف الطبي والتجميلي الثلاثي الموحد</h2>
+            <span>Clinix AI & HarmonizeAI Pro • عيادة الدكتور علي النقيب</span>
+        </div>
+
+        <div class="card-section border-green">
+            <h4>📋 1. البيانات السريرية والنفسية للحالة</h4>
+            <div class="grid-2col">
+                <div>
+                    <label>👤 معرف المريض:</label>
+                    <input type="text" id="pName" value="حالة ماستير تجميلية - رقم #309">
+                </div>
+                <div>
+                    <label>⚠️ التشخيص والشكوى:</label>
+                    <select id="pSymptoms" onchange="updateAllLayers()">
+                        <option value="aesthetic">فراغات وتناظر غير مثالي في الابتسامة (Aesthetic Asymmetry)</option>
+                        <option value="pain">ألم حاد مع حاجة لإعادة التأهيل الإطباقي الكامل</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2col margin-v">
+            <div class="card-section text-center">
+                <h5 class="title-blue">🖼️ الصورة 1: التقييم الوجهي الساكن (Profile)</h5>
+                <img id="imgProfile" src="" alt="صورة الوجه">
+            </div>
+            <div class="card-section text-center">
+                <h5 class="title-red">🩻 الصورة 3: فحص الأشعة (Radiographic)</h5>
+                <img id="imgXray" src="" alt="صورة الأشعة">
+            </div>
+        </div>
+
+        <div class="card-section border-blue bg-dark-blue">
+            <h4>🧠 2. التقرير المشترك لمحرك الذكاء الاصطناعي</h4>
+            <div id="aiOutput">تحليل البيانات التناظرية والإشعاعية للمريض...</div>
+        </div>
+
+        <div class="card-section border-gray">
+            <h4>🦷 3. استوديو محاكاة وتعديل الابتسامة (HarmonizeAI Studio)</h4>
+            
+            <div class="controls-row">
+                <label>↔️ نقل أفقي: <input type="range" id="globalX" min="-300" max="300" value="0" oninput="drawEverything()"></label>
+                <label>↕️ نقل عمودي: <input type="range" id="globalY" min="-300" max="300" value="0" oninput="drawEverything()"></label>
+                <label class="text-green">🔍 حجم الطقم: <input type="range" id="globalScale" min="30" max="300" value="100" oninput="drawEverything()"></label>
+            </div>
+
+            <div class="mode-row">
+                <div>
+                    <span class="text-gray-bold">🖱️ وضع اللمس:</span>
+                    <label><input type="radio" name="touchMode" value="move" checked> تحريك الأسنان</label>
+                    <label><input type="radio" name="touchMode" value="draw"> رسم حر</label>
+                </div>
+                <select id="brushColor">
+                    <option value="#38bdf8">🔵 تحليل تجميلي</option>
+                    <option value="#ffffff">⚪ بناء عاجي</option>
+                    <option value="#f43f5e">🔴 لثة</option>
+                </select>
+            </div>
+
+            <div class="canvas-wrapper">
+                <canvas id="clinixCanvas" width="600" height="450"></canvas>
+            </div>
+        </div>
+
+        <button onclick="window.print()" class="btn-print">
+            🖨️ طباعة أو حفظ الملف الطبي الثلاثي المتكامل كـ PDF
+        </button>
+    </div>
+
+    <script>
+        var canvas = document.getElementById('clinixCanvas');
+        var ctx = canvas.getContext('2d');
+        var smileImg = new Image();
+        
+        var drawingActions = [];
+        var isDrawingNow = false;
+        var currentPath = [];
+        var selectedToothIndex = -1;
+
+        var teethData = [
+            {id: 'U13', name: 'الناب R', relX: -1.5, relY: 6, w: 22, h: 33, baseRot: 5, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0},
+            {id: 'U12', name: 'الرباعية R', relX: -0.9, relY: 1, w: 18, h: 28, baseRot: 3, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0},
+            {id: 'U11', name: 'الثنية R', relX: -0.3, relY: -4, w: 24, h: 35, baseRot: 1, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0},
+            {id: 'U21', name: 'الثنية L', relX: 0.3, relY: -4, w: 24, h: 35, baseRot: -1, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0},
+            {id: 'U22', name: 'الرباعية L', relX: 0.9, relY: 1, w: 18, h: 28, baseRot: -3, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0},
+            {id: 'U23', name: 'الناب L', relX: 1.5, relY: 6, w: 22, h: 33, baseRot: -5, customRot: 0, sizeScale: 1.0, offsetX: 0, offsetY: 0, currentCX: 0, currentCY: 0}
+        ];
+
+        // سيتم حقن مسارات الصور من بايثون لاحقاً
+        function loadImages(profileB64, smileB64, xrayB64) {
+            document.getElementById('imgProfile').src = "data:image/png;base64," + profileB64;
+            document.getElementById('imgXray').src = "data:image/png;base64," + xrayB64;
+            smileImg.src = "data:image/png;base64," + smileB64;
+            smileImg.onload = function() { updateAllLayers(); };
+        }
+
+        function updateAllLayers() {
+            var sym = document.getElementById('pSymptoms').value;
+            var text = "";
+            if(sym === "aesthetic") {
+                text = "<b>• تقييم الأشعة واللثة:</b> كثافة عظمية مستقرة تماماً. خط مستعرض اللثة متماثل جزئياً.<br><b>• تحليل الابتسامة التجميلي:</b> انحراف طفيف في خط المنتصف السني بمقدار 0.8 ملم يساراً. القواطع الجانبية تحتاج تعديل نسبي بمقدار 12% للوصول للنسبة الذهبية.";
+            } else {
+                text = "<b>• تقييم الأشعة:</b> اشتباه بنقص كثافة عظمية حول الذروة، يوصى بعلاج عصب عاجل للسن المتضرر قبل بدء التحضيرات التجميلية.";
+            }
+            document.getElementById('aiOutput').innerHTML = text;
+            drawEverything();
+        }
+
+        function drawEverything() {
+            var dx = parseInt(document.getElementById('globalX').value);
+            var dy = parseInt(document.getElementById('globalY').value);
+            var scale = parseInt(document.getElementById('globalScale').value) / 100.0;
+            var spacing = 145;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(smileImg, 0, 0, canvas.width, canvas.height);
+
+            teethData.forEach(function(t) {
+                t.currentCX = (canvas.width * 0.5) + dx + (t.relX * spacing * scale) + t.offsetX;
+                t.currentCY = (canvas.height * 0.5) + dy + (t.relY * scale) + t.offsetY;
+                
+                ctx.save();
+                ctx.translate(t.currentCX, t.currentCY);
+                ctx.rotate(t.baseRot * Math.PI / 180);
+                
+                ctx.beginPath();
+                var hw = (t.w * scale) / 2; var hh = (t.h * scale) / 2;
+                ctx.moveTo(-hw * 0.85, -hh);
+                ctx.bezierCurveTo(-hw * 0.95, -hh * 0.2, -hw * 1.05, hh * 0.7, -hw, hh);
+                ctx.lineTo(hw, hh);
+                ctx.bezierCurveTo(hw * 1.05, hh * 0.7, hw * 0.95, -hh * 0.2, hw * 0.85, -hh);
+                ctx.closePath();
+                
+                var grad = ctx.createLinearGradient(0, hh, 0, -hh);
+                grad.addColorStop(0, '#e2e8f0'); grad.addColorStop(0.3, '#ffffff');
+                ctx.fillStyle = grad; ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.stroke();
+                ctx.restore();
+            });
+
+            drawingActions.forEach(function(action) {
+                ctx.strokeStyle = action.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+                ctx.beginPath();
+                for (var i = 0; i < action.points.length; i++) {
+                    if (i === 0) ctx.moveTo(action.points[i].x, action.points[i].y);
+                    else ctx.lineTo(action.points[i].x, action.points[i].y);
+                }
+                ctx.stroke();
+            });
+        }
+
+        function getCoords(e) {
+            var rect = canvas.getBoundingClientRect();
+            var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+        }
+
+        canvas.addEventListener('mousedown', function(e) {
+            var coords = getCoords(e);
+            var mode = document.querySelector('input[name="touchMode"]:checked').value;
+            if(mode === 'draw') { isDrawingNow = true; currentPath = [coords]; }
+            else {
+                selectedToothIndex = -1;
+                teethData.forEach(function(t, idx) {
+                    var d = Math.sqrt(Math.pow(coords.x - t.currentCX, 2) + Math.pow(coords.y - t.currentCY, 2));
+                    if(d < 45) selectedToothIndex = idx;
+                });
+            }
+            lastX = coords.x; lastY = coords.y;
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+            var coords = getCoords(e);
+            var mode = document.querySelector('input[name="touchMode"]:checked').value;
+            if(mode === 'draw' && isDrawingNow) {
+                currentPath.push(coords);
+                ctx.strokeStyle = document.getElementById('brushColor').value;
+                ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(coords.x, coords.y); ctx.stroke();
+                lastX = coords.x; lastY = coords.y;
+            } else if(mode === 'move' && selectedToothIndex !== -1) {
+                teethData[selectedToothIndex].offsetX += (coords.x - lastX);
+                teethData[selectedToothIndex].offsetY += (coords.y - lastY);
+                lastX = coords.x; lastY = coords.y; drawEverything();
+            }
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            if(isDrawingNow && currentPath.length > 0) drawingActions.push({points: currentPath, color: document.getElementById('brushColor').value});
+            isDrawingNow = false; drawEverything();
+        });
+    </script>
+</body>
+</html>
