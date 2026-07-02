@@ -1,38 +1,55 @@
+import os
+import glob
 from scripts.vision_processor import FacialVisionEngine
 from scripts.analysis_logic import DentoFacialEngine
-import json
+
+# المسار المربوط من Google Drive الخاص ببيانات المرضى
+# تأكد من تطابق هذا المسار مع المسار الفعلي في الـ Drive الخاص بك
+DATA_PATH = '/content/drive/MyDrive/HarmonizeAI_Data/raw/'
 
 def run_harmonize_ai_pipeline():
     print("🚀 Starting DentoFacial-HarmonizeAI Integrated Pipeline...")
     
-    # 1. تهيئة المحركات
+    # تهيئة محرك الرؤية
     vision_unit = FacialVisionEngine()
-    analysis_unit = DentoFacialEngine(patient_id="CASE_YEM_2026_01")
     
-    # 2. استخراج النقاط التشريحية من الصورة آلياً
-    image_path = 'images/patient_test.jpg'
-    print(f"📸 Processing image: {image_path}")
+    # الحصول على كافة صور المرضى من المجلد تلقائياً
+    # يبحث الكود عن أي ملف يبدأ بحرف 'p' وينتهي بـ '.jpg'
+    patient_files = glob.glob(os.path.join(DATA_PATH, 'p*.jpg'))
     
-    medical_points = vision_unit.get_ortho_points(image_path)
-    
-    if medical_points:
-        print("✅ Landmarks detected successfully.")
+    if not patient_files:
+        print("⚠️ No patient files found in the directory. Please check the path.")
+        return
+
+    # المعالجة التلقائية لكل مريض
+    for image_path in patient_files:
+        patient_id = os.path.basename(image_path).split('.')[0]
+        print(f"\n--- Processing: {patient_id} ---")
         
-        # 3. إرسال النقاط لمحرك الحسابات (الزاوية الأنفية الشفوية مثلاً)
-        # ملاحظة: سنستخدم النقاط المستخرجة (Nose, Subnasale, Upper Lip)
-        analysis_unit.analyze_profile(
-            n_tip=medical_points['NOSE_TIP'],
-            sn=medical_points['SUBNASALE'],
-            ul=medical_points['UPPER_LIP'],
-            ll=medical_points['LOWER_LIP'],
-            pg=medical_points['CHIN']
-        )
+        # تهيئة المحلل لكل مريض على حدة لضمان استقلالية التقارير
+        analysis_unit = DentoFacialEngine(patient_id=patient_id)
         
-        # 4. توليد التقرير النهائي
-        print("\n--- 📄 FINAL CLINICAL REPORT ---")
-        analysis_unit.generate_report()
-    else:
-        print("❌ Failed to detect landmarks. Please check image quality.")
+        # استخراج النقاط التشريحية من الصورة آلياً
+        print(f"📸 Analyzing image: {image_path}")
+        medical_points = vision_unit.get_ortho_points(image_path)
+        
+        if medical_points:
+            print("✅ Landmarks detected successfully.")
+            
+            # إرسال النقاط لمحرك الحسابات
+            analysis_unit.analyze_profile(
+                n_tip=medical_points['NOSE_TIP'],
+                sn=medical_points['SUBNASALE'],
+                ul=medical_points['UPPER_LIP'],
+                ll=medical_points['LOWER_LIP'],
+                pg=medical_points['CHIN']
+            )
+            
+            # توليد التقرير النهائي
+            analysis_unit.generate_report()
+            print(f"✅ Report generated for {patient_id}")
+        else:
+            print(f"❌ Failed to detect landmarks for {patient_id}. Please check image quality.")
 
 if __name__ == "__main__":
     run_harmonize_ai_pipeline()
