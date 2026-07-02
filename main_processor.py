@@ -3,40 +3,35 @@ import glob
 from scripts.vision_processor import FacialVisionEngine
 from scripts.analysis_logic import DentoFacialEngine
 
-# المسار المربوط من Google Drive الخاص ببيانات المرضى
-# تأكد من تطابق هذا المسار مع المسار الفعلي في الـ Drive الخاص بك
-DATA_PATH = '/content/drive/MyDrive/HarmonizeAI_Data/raw/'
+# المسار المحدث ليطابق تنظيم ملفاتك في Google Drive
+DATA_PATH = '/content/drive/MyDrive/data/raw/clinical-record/'
 
 def run_harmonize_ai_pipeline():
     print("🚀 Starting DentoFacial-HarmonizeAI Integrated Pipeline...")
     
-    # تهيئة محرك الرؤية
     vision_unit = FacialVisionEngine()
     
-    # الحصول على كافة صور المرضى من المجلد تلقائياً
-    # يبحث الكود عن أي ملف يبدأ بحرف 'p' وينتهي بـ '.jpg'
-    patient_files = glob.glob(os.path.join(DATA_PATH, 'p*.jpg'))
+    # البحث عن الصور داخل المجلدات الفرعية (مثل p001/patient.jpg)
+    # الرمز ** يعني البحث في أي مجلدات فرعية، و recursive=True ضرورية لذلك
+    search_path = os.path.join(DATA_PATH, '**', 'p*.jpg')
+    patient_files = glob.glob(search_path, recursive=True)
     
     if not patient_files:
-        print("⚠️ No patient files found in the directory. Please check the path.")
+        print(f"⚠️ No patient files found in {DATA_PATH}. Please check the path.")
         return
 
-    # المعالجة التلقائية لكل مريض
     for image_path in patient_files:
-        patient_id = os.path.basename(image_path).split('.')[0]
-        print(f"\n--- Processing: {patient_id} ---")
+        # استخراج اسم المجلد الفرعي ليكون هو الـ ID للمريض
+        patient_id = os.path.basename(os.path.dirname(image_path))
+        print(f"\n--- Processing Patient: {patient_id} ---")
         
-        # تهيئة المحلل لكل مريض على حدة لضمان استقلالية التقارير
         analysis_unit = DentoFacialEngine(patient_id=patient_id)
         
-        # استخراج النقاط التشريحية من الصورة آلياً
         print(f"📸 Analyzing image: {image_path}")
         medical_points = vision_unit.get_ortho_points(image_path)
         
         if medical_points:
             print("✅ Landmarks detected successfully.")
-            
-            # إرسال النقاط لمحرك الحسابات
             analysis_unit.analyze_profile(
                 n_tip=medical_points['NOSE_TIP'],
                 sn=medical_points['SUBNASALE'],
@@ -44,12 +39,10 @@ def run_harmonize_ai_pipeline():
                 ll=medical_points['LOWER_LIP'],
                 pg=medical_points['CHIN']
             )
-            
-            # توليد التقرير النهائي
             analysis_unit.generate_report()
             print(f"✅ Report generated for {patient_id}")
         else:
-            print(f"❌ Failed to detect landmarks for {patient_id}. Please check image quality.")
+            print(f"❌ Failed to detect landmarks for {patient_id}.")
 
 if __name__ == "__main__":
     run_harmonize_ai_pipeline()
