@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Custom ignore rules for HarmonizeAI
+data/input/*
+data/output/*
+!data/input/.gitkeep
+!data/output/.gitkeep
+
+# Virtual Environments (in case they aren't covered)
+.venv/
+venv/
+env/
