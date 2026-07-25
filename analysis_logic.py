@@ -1,34 +1,69 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import math
 
-class FacialHarmonyAnalyzer:
+class HarmonizeAnalyzer:
     def __init__(self):
         self.mp_face_mesh = mp.solutions.face_mesh
-        self.face_mesh = self.mp_face_mesh.FaceMesh(static_image_mode=True, max_num_faces=1)
-        
-    def extract_landmarks(self, image_path):
+        self.face_mesh = self.mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5
+        )
+
+    def process_image(self, image_path):
+        """تحميل الصورة واستخراج نقاط الوجه (Landmarks)"""
         image = cv2.imread(image_path)
         if image is None:
-            return None
+            return None, None, "لم يتم العثور على الصورة، تحقق من المسار."
         
-        h, w, _ = image.shape
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(rgb_image)
         
-        landmarks_dict = {}
-        if results.multi_face_landmarks:
-            for face_landmarks in results.multi_face_landmarks:
-                # عينات من النقاط التشريحية المعتمدة في الماجستير
-                landmarks_dict['Nasion'] = (int(face_landmarks.landmark[8].x * w), int(face_landmarks.landmark[8].y * h))
-                landmarks_dict['Pronasale'] = (int(face_landmarks.landmark[4].x * w), int(face_landmarks.landmark[4].y * h))
-                landmarks_dict['Subnasale'] = (int(face_landmarks.landmark[94].x * w), int(face_landmarks.landmark[94].y * h))
-                landmarks_dict['Pogonion'] = (int(face_landmarks.landmark[152].x * w), int(face_landmarks.landmark[152].y * h))
-                landmarks_dict['Labrale_inferius'] = (int(face_landmarks.landmark[17].x * w), int(face_landmarks.landmark[17].y * h))
-        return landmarks_dict
+        if not results.multi_face_landmarks:
+            return None, image, "لم يتم التعرف على الوجه في الصورة."
+            
+        landmarks = results.multi_face_landmarks[0]
+        h, w, _ = image.shape
+        
+        # تحويل إحداثيات النقاط إلى بكسل (Pixel Coordinates)
+        points = {}
+        for idx, lm in enumerate(landmarks.landmark):
+            points[idx] = (int(lm.x * w), int(lm.y * h))
+            
+        return points, image, "تم استخراج النقاط بنجاح."
 
-    def calculate_nasolabial_angle(self, landmarks):
-        # معادلة رياضية لحساب زاوية الشفة والأنف عيادياً
-        if not landmarks or 'Subnasale' not in landmarks:
-            return 95.0 # قيمة افتراضية متناسقة في حال غياب النقطة
-        return 95.0
+    def analyze_e_line(self, points):
+        """حساب خط Ricketts E-Line للبروفايل (من قمة الأنف إلى الذقن)"""
+        # أهم النقاط في MediaPipe:
+        # Pronasale (قمة الأنف) = 1
+        # Soft Tissue Pogonion (قمة الذقن) = 152
+        # Labriale Superius (الشفة العليا) = 0
+        # Labriale Inferius (الشفة السفلى) = 17
+        
+        if 1 not in points or 152 not in points or 0 not in points or 17 not in points:
+            return "تعذر حساب E-Line، بعض النقاط غير واضحة."
+
+        nose_tip = np.array(points[1])
+        chin = np.array(points[152])
+        upper_lip = np.array(points[0])
+        lower_lip = np.array(points[17])
+
+        # حساب المسافة العمودية من الشفاه إلى الخط الواصل بين الأنف والذقن
+        def point_to_line_dist(p, line_p1, line_p2):
+            return np.cross(line_p2 - line_p1, p - line_p1) / np.linalg.norm(line_p2 - line_p1)
+
+        dist_upper = point_to_line_dist(upper_lip, nose_tip, chin)
+        dist_lower = point_to_line_dist(lower_lip, nose_tip, chin)
+
+        return {
+            "Upper Lip to E-Line (px)": round(float(dist_upper), 2),
+            "Lower Lip to E-Line (px)": round(float(dist_lower), 2)
+        }
+
+# مثال بسيط للتشغيل والتجربة
+if __name__ == "__main__":
+    analyzer = HarmonizeAnalyzer()
+    print("HarmonizeAI Analyzer Ready!")
