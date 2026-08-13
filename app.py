@@ -1,3 +1,25 @@
+import subprocess
+import sys
+
+try:
+    import mediapipe as mp
+except ImportError:
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "mediapipe==0.10.9"]
+    )
+    import mediapipe as mp
+
+import streamlit as st
+import cv2
+from analysis_logic import HarmonizeAnalyzer
+
+# بقية كود التطبيق الخاص بك...
+st.set_page_config(
+    page_title="HarmonizeAI - Dentofacial Synergy", page_icon="🦷", layout="wide"
+)
+st.title("🦷 HarmonizeAI - Comprehensive Dentofacial Analysis")
+# ... وباقي الكود الأصلي
+
 import streamlit as st
 import cv2
 from analysis_logic import HarmonizeAnalyzer
