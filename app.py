@@ -1,19 +1,10 @@
-importimport streamlit as st
-import cv2
-from analysis_logic import HarmonizeAnalyzer
-
-st.set_page_page_config(
-    page_title="HarmonizeAI - Dentofacial Synergy", page_icon="🦷", layout="wide"
-)
-st.title("🦷 HarmonizeAI - Comprehensive Dentofacial Analysis")
-# وبقية الكود الخاص بك...
-
-
 import streamlit as st
 import cv2
 from analysis_logic import HarmonizeAnalyzer
 
-st.set_page_config(page_title="HarmonizeAI - Dentofacial Synergy", page_icon="🦷", layout="wide")
+st.set_page_config(
+    page_title="HarmonizeAI - Dentofacial Synergy", page_icon="🦷", layout="wide"
+)
 st.title("🦷 HarmonizeAI - Comprehensive Dentofacial Analysis")
 
 @st.cache_resource
@@ -22,7 +13,10 @@ def load_analyzer():
 
 analyzer = load_analyzer()
 
-uploaded_file = st.file_uploader("قم برفع صورة البروفايل أو المنظر الأمامي (JPG / PNG):", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader(
+    "قم برفع صورة البروفايل أو المنظر الأمامي (JPG / PNG):",
+    type=["jpg", "jpeg", "png"],
+)
 
 if uploaded_file is not None:
     temp_path = "temp_patient_image.jpg"
@@ -37,10 +31,8 @@ if uploaded_file is not None:
         st.success(message)
         report = analyzer.generate_full_clinical_report(points)
 
-        # رسم الخطوط والتخطيط السريري
         annotated_image = image.copy()
-        
-        # رسم مثلث البروفايل وخط E-Line
+
         if 10 in points and 2 in points and 152 in points:
             cv2.line(annotated_image, points[10], points[2], (0, 255, 255), 2)
             cv2.line(annotated_image, points[2], points[152], (0, 255, 255), 2)
