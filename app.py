@@ -1,5 +1,3 @@
-```python
-# app.py - تطبيق Dentofacial HarmonizeAI™ باستخدام Streamlit
 
 import streamlit as st
 import pandas as pd
