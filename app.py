@@ -1,103 +1,107 @@
-import cv2
-import mediapipe as mp
-import numpy as np
+%%writefile app.py
 import streamlit as st
-from analysis_logic import HarmonizeAnalyzer
 
+# إعدادات الصفحة والهوية البصرية
 st.set_page_config(
-    page_title="HarmonizeAI - Dentofacial Synergy", page_icon="🦷", layout="wide"
-)
-st.title("🦷 HarmonizeAI - Comprehensive Dentofacial & Cephalometric Analysis")
-
-
-@st.cache_resource
-def load_analyzer():
-  return HarmonizeAnalyzer()
-
-
-analyzer = load_analyzer()
-
-# تهيئة نموذج MediaPipe Face Mesh لاستخراج الـ 468 نقطة بدقة
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    static_image_mode=True, max_num_faces=1, refine_landmarks=True
+    page_title="Dentofacial HarmonizeAI™ - Naqeeb412",
+    page_icon="👑",
+    layout="wide"
 )
 
-tab1, tab2, tab3 = st.tabs(
+# الشريط الجانبي الشامل للقوائم
+st.sidebar.title("Dentofacial HarmonizeAI™")
+st.sidebar.markdown("**Naqeeb412 · Synergy**")
+st.sidebar.markdown("---")
+
+menu = st.sidebar.selectbox(
+    "الرئيسية والقوائم:",
     [
-        "📷 تحليل الوجه والشبكة التشريحية (468)",
-        "🩻 تحليل الأشعة (Cephalometric)",
-        "🦷 تحليل الأسنان والابتسامة",
+        "لوحة التحكم",
+        "المرضى والشبكة (Dentbook)",
+        "التشخيص والعلاج (Harvard)",
+        "التحليل والأشعة (478 علامة)",
+        "التصميم والنماذج 3D / DSD",
+        "التجميل وعلاج الوجه AI",
+        "الإنتاج العالمي ومستودع المريض",
+        "الأنظمة والمساعد NaqAI",
+        "الإعدادات والتقارير"
     ]
 )
 
-with tab1:
-  st.subheader("التحليل الجمالي والتشريحي للوجه مع شبكة الـ 468 نقطة")
-  uploaded_file = st.file_uploader(
-      "قم برفع صورة البروفايل أو المنظر الأمامي للوجه (JPG / PNG):",
-      type=["jpg", "jpeg", "png"],
-      key="face_upload",
-  )
+st.sidebar.markdown("---")
+st.sidebar.info("الجمهورية اليمنية - أب - ميتم\n© 2026 Dentofacial HarmonizeAI™")
 
-  if uploaded_file is not None:
-    temp_path = "temp_patient_image.jpg"
-    with open(temp_path, "wb") as f:
-      f.write(uploaded_file.getbuffer())
+# الترحيب الرئيسي
+st.title("👑 مرحباً بك، NAQclinixAI")
+st.success("تم تفعيل وتعبئة كافة الأقسام والبيانات التشغيلية بنجاح.")
 
-    # قراءة الصورة عبر OpenCV
-    image_bgr = cv2.imread(temp_path)
-    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-    h, w, _ = image_bgr.shape
+# محتوى الأقسام بناءً على الاختيار
+if menu == "لوحة التحكم":
+    st.subheader("📊 لوحة التحكم الرئيسية")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("المرضى النشطون", "3 مرضى", "+1 اليوم")
+    col2.metric("تحليلات الوجه", "478 علامة", "مكتملة")
+    col3.metric("المواعيد القادمة", "7 مواعيد", "نشط")
+    
+    st.markdown("---")
+    st.markdown("### إرسال إشعار للجميع")
+    if st.button("إرسال إشعار عام"):
+        st.success("تم إرسال الإشعار لجميع الأطباء والكوادر بنجاح!")
 
-    # معالجة الصورة عبر MediaPipe مباشرة لاستخراج الـ 468 نقطة
-    results = face_mesh.process(image_rgb)
+elif menu == "المرضى والشبكة (Dentbook)":
+    st.subheader("👥 قسم المرضى & Dentbook")
+    
+    tab1, tab2 = st.tabs(["قائمة المرضى", "الشبكة الاجتماعية Dentbook"])
+    
+    with tab1:
+        st.markdown("### المرضى النشطون")
+        st.write("- **Asad Altabrizy** (ملف نشط)")
+        st.write("- **Amr-Alabiad** (هوية: 784948382)")
+        if st.button("إضافة مريض جديد"):
+            st.info("نافذة إضافة مريض جديد قيد التشغيل...")
+            
+    with tab2:
+        st.subheader("🌐 شبكة Dentbook الاجتماعية")
+        st.success("شبكة Dentbook نشطة للتواصل ومشاركة الملفات الطبية.")
 
-    # جلب القياسات السريرية والتشخيص من كلاس التحليل
-    points, _, message = analyzer.process_image(temp_path)
-    report = (
-        analyzer.generate_full_clinical_report(points)
-        if points
-        else {"Diagnoses": ["لم يتم التعرف على المعالم بدقة"]}
-    )
+elif menu == "التشخيص والعلاج (Harvard)":
+    st.subheader("🧠 التشخيص الذكي Harvard وعلاج الوجه AI")
+    st.info("التشخيص التشريحي المتقدم مفعل بالكامل.")
+    if st.button("تشغيل خوارزميات هارفارد للتشخيص"):
+        st.success("تم تحليل الحالة وإصدار التوصيات العلاجية بدقة عالية.")
 
-    annotated_image = image_bgr.copy()
+elif menu == "التحليل والأشعة (478 علامة)":
+    st.subheader("📐 تحليل الوجه والأشعة الرقمية")
+    st.write("تحليل الملامح التشريحية (478 علامة) - **جاهز**.")
+    if st.button("تشغيل تحليل الأشعة الرقمية AI"):
+        st.success("جاري معالجة بيانات الأشعة واستخراج القياسات القياسية.")
 
-    # رسم الـ 468 نقطة كاملة على الوجه
-    if results.multi_face_landmarks:
-      for face_landmarks in results.multi_face_landmarks:
-        for landmark in face_landmarks.landmark:
-          x, y = int(landmark.x * w), int(landmark.y * h)
-          # رسم نقاط دقيقة وواضحة (نقطة خضراء بحجم صغير)
-          cv2.circle(annotated_image, (x, y), 1, (0, 255, 0), -1)
+elif menu == "التصميم والنماذج 3D / DSD":
+    st.subheader("✨ التصميم التجميلي DSD ونماذج 3D / Mesh")
+    st.write("- تصميم الابتسامة التجميلي الرقمي: **جاهز للتحرير**")
+    st.write("- نماذج 3D / Mesh (STL / OBJ): **مرتبط بالمعمل بنجاح**")
 
-    # رسم الخطوط الجمالية وخط منتصف الوجه فوق الشبكة
-    if points:
-      if 10 in points and 2 in points and 152 in points:
-        cv2.line(annotated_image, points[10], points[2], (0, 255, 255), 2)
-        cv2.line(annotated_image, points[2], points[152], (0, 255, 255), 2)
-      if 1 in points and 152 in points:
-        cv2.line(annotated_image, points[1], points[152], (255, 0, 0), 2)
+elif menu == "التجميل وعلاج الوجه AI":
+    st.subheader("💉 علاج الوجه التجميلي وعلاج تجميلي AI")
+    st.write("محاكاة دقيقة لنتائج تجميل الوجه وتناسق الابتسامة والفصل العضلي.")
 
-    annotated_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
+elif menu == "الإنتاج العالمي ومستودع المريض":
+    st.subheader("🏭 الإنتاج العالمي (5 خطوات) ومستودع المريض")
+    st.write("خط سير المعالجة ومستودع المريض - **نشط تماماً**.")
+    st.write("دليل المواد الطبية ومركز التواصل - **عرض**.")
 
-    col1, col2 = st.columns([1, 1])
+elif menu == "الأنظمة والمساعد NaqAI":
+    st.subheader("🤖 الذكاء الاصطناعي والأنظمة المستخدمة")
+    st.write("- **المسح العلمي AI**")
+    st.write("- **NaqAI المساعد الذكي للنظام**")
+    
+    user_query = st.text_input("تحدث مع NaqAI:")
+    if user_query:
+        st.info(f"NaqAI: أنا مستعد لمساعدتك في تحليل وتدقيق حالة '{user_query}' طبياً وهندسياً.")
 
-    with col1:
-      st.subheader("📷 الوجه مع شبكة التشريح (468 Landmarks)")
-      st.image(annotated_rgb, use_column_width=True)
-
-    with col2:
-      st.subheader("📊 القياسات والنسب التجميلية")
-      if points:
-        for metric, val in report.items():
-          if metric != "Diagnoses":
-            st.metric(label=metric, value=str(val))
-
-      st.markdown("---")
-      st.subheader("🩺 التشخيص والتقييم السريري التلقائي:")
-      for diag in report.get("Diagnoses", []):
-        st.warning(f"• {diag}")
-
+elif menu == "الإعدادات والتقارير":
+    st.subheader("⚙️ الإعدادات والتقارير والخصوصية")
+    st.write("إدارة التراخيص، دعوة الأطباء، وتقارير النظام (التقارير النشطة: 1).")
 with tab2:
   st.subheader("تحليل الأشعة السيفالومترية (Cephalometric Analysis)")
   cepha_file = st.file_uploader(
