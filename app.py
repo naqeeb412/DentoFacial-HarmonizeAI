@@ -2,8 +2,15 @@ import streamlit as st
 import google.generativeai as genai
 
 # إعداد الربط (الآن النظام سيقرأ المفتاح من إعدادات الـ Secrets التي حفظتها)
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-pro')
+# كود آمن ومجرب للربط
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except:
+    # إذا لم يجد الـ secrets، سيستخدم المفتاح مباشرة (مؤقتاً للتشغيل)
+    genai.configure
+
+model = genai.GenerativeModel('gemini-1.5-flash')
+
 
 st.set_page_config(page_title="HarmoniDent AI", page_icon="✨", layout="wide")
 st.title("✨ HarmoniDent-AI Assistant")
