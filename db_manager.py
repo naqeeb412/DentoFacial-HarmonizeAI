@@ -5,7 +5,6 @@ import os
 DB_NAME = "harmonize_ai.db"
 
 def init_db():
-    """إنشاء قاعدة البيانات وجداول المرضى والتحليلات"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
@@ -31,7 +30,6 @@ def init_db():
     conn.close()
 
 def add_patient(name, age, phone):
-    """إضافة مريض جديد إلى قاعدة البيانات"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute(
@@ -44,7 +42,6 @@ def add_patient(name, age, phone):
     return patient_id
 
 def get_patients_df():
-    """استرجاع سجل المرضى كاملاً كـ DataFrame باستخدام Pandas"""
     conn = sqlite3.connect(DB_NAME)
     query = """
         SELECT 

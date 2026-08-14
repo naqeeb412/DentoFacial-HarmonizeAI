@@ -6,13 +6,11 @@ from analysis_engine import HarmonizeAnalyzer
 import db_manager as db
 from config import PAGE_CONFIG
 
-# 1. تهيئة الصفحة
 st.set_page_config(**PAGE_CONFIG)
 
 st.title("🦷 DentoFacial-HarmonizeAI™")
 st.markdown("##### المنصة الذكية لتحليل الوجه وتناسق الابتسامة (478 Landmark Detection)")
 
-# 2. تحميل المحرك وقاعدة البيانات
 @st.cache_resource
 def load_analyzer():
     return HarmonizeAnalyzer()
@@ -20,14 +18,12 @@ def load_analyzer():
 analyzer = load_analyzer()
 db.init_db()
 
-# 3. القائمة الجانبية
 st.sidebar.header("لوحة التحكم الإكلينيكية")
 menu_option = st.sidebar.radio(
     "انتقل إلى:",
     ["📷 التحليل التشريحي للوجه", "📋 إدارة المرضى (Dentbook)", "📊 التقارير والتصدير (Pandas)"]
 )
 
-# --- القسم الأول: التحليل التشريحي ---
 if menu_option == "📷 التحليل التشريحي للوجه":
     st.subheader("تحليل معالم الوجه والابتسامة الرقمي")
     
@@ -54,10 +50,8 @@ if menu_option == "📷 التحليل التشريحي للوجه":
             st.markdown("---")
             st.markdown("### 📈 جدولة المؤشرات الإكلينيكية (Pandas Table)")
             
-            # عرض جدول Pandas للنتائج
             st.dataframe(metrics_df, use_container_width=True)
 
-            # خيار تنزيل التقرير بصيغة CSV بواسطة Pandas
             csv_data = metrics_df.to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 تحميل التقرير الإكلينيكي (CSV)",
@@ -68,7 +62,6 @@ if menu_option == "📷 التحليل التشريحي للوجه":
         else:
             st.error("لم يتم العثور على معالم الوجه في الصورة. يرجى التأكد من وضوح الإضاءة وزاوية التقاط الصورة.")
 
-# --- القسم الثاني: إدارة المرضى ---
 elif menu_option == "📋 إدارة المرضى (Dentbook)":
     st.subheader("سجلات المرضى وحفظ الحالات")
     
@@ -86,14 +79,12 @@ elif menu_option == "📋 إدارة المرضى (Dentbook)":
     st.markdown("---")
     st.write("### قائمة المرضى المسجلين (Pandas Integration)")
     
-    # عرض جدول المرضى بـ Pandas
     patients_df = db.get_patients_df()
     if not patients_df.empty:
         st.dataframe(patients_df, use_container_width=True)
     else:
         st.info("لا يوجد مرضى مسجلون حالياً.")
 
-# --- القسم الثالث: التقارير والتصدير ---
 elif menu_option == "📊 التقارير والتصدير (Pandas)":
     st.subheader("إدارة وتصدير بيانات العيادة الشاملة")
     
@@ -105,7 +96,6 @@ elif menu_option == "📊 التقارير والتصدير (Pandas)":
         col_s2.metric("متوسط العمر", f"{round(patients_df['العمر'].mean(), 1)} سنة")
         
         st.markdown("---")
-        # تصدير سجل المرضى كاملاً إلى Excel/CSV
         csv_export = patients_df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📊 تصدير قاعدة بيانات المرضى بالكامل (CSV)",

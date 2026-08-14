@@ -27,7 +27,6 @@ class HarmonizeAnalyzer:
         return {}
 
     def process_image(self, image_np):
-        """معالجة الصورة واستخراج النقاط وتوليد جدول القياسات بـ Pandas"""
         h, w, _ = image_np.shape
         image_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(image_rgb)
@@ -44,7 +43,6 @@ class HarmonizeAnalyzer:
 
         metrics = self._calculate_metrics(landmark_points, w, h)
         
-        # تحويل النتائج المباشرة إلى DataFrame بواسطة Pandas
         metrics_df = pd.DataFrame(
             list(metrics.items()), 
             columns=["المؤشر التشريحي", "القيمة الإكلينيكية"]
