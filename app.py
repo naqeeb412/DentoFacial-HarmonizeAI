@@ -3,8 +3,8 @@ import google.generativeai as genai
 
 # إعداد الربط (الآن النظام سيقرأ المفتاح من إعدادات الـ Secrets التي حفظتها)
 # كود آمن ومجرب للربط
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+try:genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
 except:
     # إذا لم يجد الـ secrets، سيستخدم المفتاح مباشرة (مؤقتاً للتشغيل)
     genai.configure
