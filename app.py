@@ -32,6 +32,7 @@ def get_db_connection():
     return conn
 
 def init_db():
+def init_db():
     conn = get_db_connection()
     c = conn.cursor()
     # جدول المستخدمين
@@ -75,6 +76,25 @@ def init_db():
         online INTEGER DEFAULT 0,
         last_seen TIMESTAMP,
         joined_at TIMESTAMP
+    )''')
+    # [باقي جداول قاعدة البيانات الخاصة بك ...]
+    conn.commit()
+
+    # إنشاء حساب المالك الافتراضي تلقائياً إذا لم يكن موجوداً
+    owner_email = "Ndcdental2025@outlook.com"
+    c.execute("SELECT * FROM users WHERE email = ?", (owner_email,))
+    if not c.fetchone():
+        owner_uid = generate_id()
+        owner_pass = hash_password("ndc2025")
+        now = get_current_time()
+        c.execute("INSERT INTO users (uid, name, email, password, role, specialty, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (owner_uid, "د. علي النقيب", owner_email, owner_pass, "doctor", "Aesthetic Dentistry", now))
+        c.execute("INSERT INTO members (email, name, role, online, joined_at) VALUES (?, ?, ?, ?, ?)",
+                  (owner_email, "د. علي النقيب", "doctor", 0, now))
+        conn.commit()
+    
+    conn.close()
+
     )''')
     # جدول منشورات Dentbook
     c.execute('''CREATE TABLE IF NOT EXISTS dentbook_posts (
