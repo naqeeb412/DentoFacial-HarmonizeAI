@@ -2,20 +2,23 @@ import http.server
 import socketserver
 import os
 
-# تحديد المنفذ المحلي
+# إعداد منفذ التشغيل وخادم الـ HTTP
 PORT = 8000
+DIRECTORY = "."
 
-# التأكد من تشغيل السيرفر من نفس مجلد HarmonizeAI
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+class CustomHandler(http.server.SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=DIRECTORY, **kwargs)
 
-Handler = http.server.SimpleHTTPRequestHandler
+def run_server():
+    with socketserver.TCPServer(("", PORT), CustomHandler) as httpd:
+        print(f"[*] خادم HarmonizeAI يعمل الآن بنجاح على المنفذ: http://localhost:{PORT}")
+        print(f"[*] يتم خدمة الملفات من المجلد الحالي: {os.path.abspath(DIRECTORY)}")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n[*] يتم إيقاف الخادم بناءً على طلب المستخدم...")
+            httpd.server_close()
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print(f"==================================================")
-    print(f"  Naqeeb412 · HarmonizeAI™ Local Server Active")
-    print(f"  URL: http://localhost:{PORT}/index.html")
-    print(f"==================================================")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nتم إيقاف الخادم بنجاح.")
+if __name__ == "__main__":
+    run_server()
