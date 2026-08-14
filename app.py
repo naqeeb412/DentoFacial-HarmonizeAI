@@ -152,20 +152,23 @@ def create_user(email, password, name, role='doctor'):
         conn.close()
 
 def authenticate(email, password):
+    # توحيد البريد الإلكتروني إلى حروف صغيرة لتجنب مشاكل المطابقة
+    email_cleaned = email.strip().lower()
     hashed = hash_password(password)
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE email = ? AND password = ?", (email, hashed))
+    c.execute("SELECT * FROM users WHERE LOWER(email) = ? AND password = ?", (email_cleaned, hashed))
     user = c.fetchone()
     conn.close()
     if user:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("UPDATE members SET online = 1, last_seen = ? WHERE email = ?", (get_current_time(), email))
+        c.execute("UPDATE members SET online = 1, last_seen = ? WHERE LOWER(email) = ?", (get_current_time(), email_cleaned))
         conn.commit()
         conn.close()
         return dict(user)
     return None
+
 
 # =============================================================
 # دالة تهيئة قاعدة البيانات (معرفة بعد الدوال المساعدة لتفادي الخطأ)
