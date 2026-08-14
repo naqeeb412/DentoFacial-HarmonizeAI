@@ -32,9 +32,9 @@ def get_db_connection():
     return conn
 
 def init_db():
-def init_db():
     conn = get_db_connection()
     c = conn.cursor()
+    
     # جدول المستخدمين
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         uid TEXT PRIMARY KEY,
@@ -50,6 +50,7 @@ def init_db():
         cover_photo TEXT,
         created_at TIMESTAMP
     )''')
+    
     # جدول المرضى
     c.execute('''CREATE TABLE IF NOT EXISTS patients (
         id TEXT PRIMARY KEY,
@@ -62,6 +63,7 @@ def init_db():
         created_by TEXT,
         created_at TIMESTAMP
     )''')
+    
     # جدول الأعضاء (للملفات الشخصية)
     c.execute('''CREATE TABLE IF NOT EXISTS members (
         email TEXT PRIMARY KEY,
@@ -77,25 +79,7 @@ def init_db():
         last_seen TIMESTAMP,
         joined_at TIMESTAMP
     )''')
-    # [باقي جداول قاعدة البيانات الخاصة بك ...]
-    conn.commit()
-
-    # إنشاء حساب المالك الافتراضي تلقائياً إذا لم يكن موجوداً
-    owner_email = "Ndcdental2025@outlook.com"
-    c.execute("SELECT * FROM users WHERE email = ?", (owner_email,))
-    if not c.fetchone():
-        owner_uid = generate_id()
-        owner_pass = hash_password("ndc2025")
-        now = get_current_time()
-        c.execute("INSERT INTO users (uid, name, email, password, role, specialty, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (owner_uid, "د. علي النقيب", owner_email, owner_pass, "doctor", "Aesthetic Dentistry", now))
-        c.execute("INSERT INTO members (email, name, role, online, joined_at) VALUES (?, ?, ?, ?, ?)",
-                  (owner_email, "د. علي النقيب", "doctor", 0, now))
-        conn.commit()
     
-    conn.close()
-
-    )''')
     # جدول منشورات Dentbook
     c.execute('''CREATE TABLE IF NOT EXISTS dentbook_posts (
         id TEXT PRIMARY KEY,
@@ -111,6 +95,7 @@ def init_db():
         comments TEXT DEFAULT '[]',
         shares INTEGER DEFAULT 0
     )''')
+    
     # جدول رسائل المجموعة العامة
     c.execute('''CREATE TABLE IF NOT EXISTS group_messages (
         id TEXT PRIMARY KEY,
@@ -124,6 +109,7 @@ def init_db():
         timestamp TIMESTAMP,
         read INTEGER DEFAULT 0
     )''')
+    
     # جدول الرسائل الخاصة
     c.execute('''CREATE TABLE IF NOT EXISTS private_messages (
         id TEXT PRIMARY KEY,
@@ -137,6 +123,7 @@ def init_db():
         timestamp TIMESTAMP,
         read INTEGER DEFAULT 0
     )''')
+    
     # جدول رسائل المختبر
     c.execute('''CREATE TABLE IF NOT EXISTS lab_messages (
         id TEXT PRIMARY KEY,
@@ -148,6 +135,7 @@ def init_db():
         type TEXT,
         timestamp TIMESTAMP
     )''')
+    
     # جدول الإشعارات
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
         id TEXT PRIMARY KEY,
@@ -159,6 +147,7 @@ def init_db():
         read INTEGER DEFAULT 0,
         target_all INTEGER DEFAULT 0
     )''')
+    
     # جدول الإعلانات
     c.execute('''CREATE TABLE IF NOT EXISTS ads (
         id TEXT PRIMARY KEY,
@@ -171,6 +160,7 @@ def init_db():
         status TEXT DEFAULT 'active',
         views INTEGER DEFAULT 0
     )''')
+    
     # جدول الأسئلة في المنتدى
     c.execute('''CREATE TABLE IF NOT EXISTS forum_questions (
         id TEXT PRIMARY KEY,
@@ -183,6 +173,7 @@ def init_db():
         created_at TIMESTAMP,
         answers TEXT DEFAULT '[]'
     )''')
+    
     # جدول المواد العلاجية
     c.execute('''CREATE TABLE IF NOT EXISTS materials (
         id TEXT PRIMARY KEY,
@@ -190,6 +181,7 @@ def init_db():
         usage TEXT,
         created_at TIMESTAMP
     )''')
+    
     # جدول طلبات المختبر
     c.execute('''CREATE TABLE IF NOT EXISTS lab_orders (
         id TEXT PRIMARY KEY,
@@ -199,7 +191,22 @@ def init_db():
         amount REAL,
         date TIMESTAMP
     )''')
+    
     conn.commit()
+
+    # إنشاء حساب المالك الافتراضي تلقائياً إذا لم يكن موجوداً
+    owner_email = "Ndcdental2025@outlook.com"
+    c.execute("SELECT * FROM users WHERE email = ?", (owner_email,))
+    if not c.fetchone():
+        owner_uid = generate_id()
+        owner_pass = hash_password("ndc2025")
+        now = get_current_time()
+        c.execute("INSERT INTO users (uid, name, email, password, role, specialty, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (owner_uid, "د. علي النقيب", owner_email, owner_pass, "doctor", "Aesthetic Dentistry", now))
+        c.execute("INSERT INTO members (email, name, role, online, joined_at) VALUES (?, ?, ?, ?, ?)",
+                  (owner_email, "د. علي النقيب", "doctor", 0, now))
+        conn.commit()
+    
     conn.close()
 
 # تهيئة قاعدة البيانات
@@ -354,7 +361,7 @@ def add_private_message(sender, sender_email, recipient, text, image_url=None, v
     now = get_current_time()
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO private_messages (id, sender, sender_email, recipient, text, image_url, video_url, audio_url, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO private_messages (id, sender, sender_email, recipient, text, image_url, video_url, audio_url, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
               (mid, sender, sender_email, recipient, text, image_url, video_url, audio_url, now))
     conn.commit()
     conn.close()
@@ -378,33 +385,6 @@ def add_forum_question(title, body, asked_by, asked_by_uid, assigned_to='all'):
     conn.commit()
     conn.close()
     return qid
-
-def add_forum_answer(qid, answer_text, author, author_uid, is_specialist):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT answers FROM forum_questions WHERE id = ?", (qid,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return
-    answers = json.loads(row['answers']) if row['answers'] else []
-    answers.append({
-        "text": answer_text,
-        "author": author,
-        "author_uid": author_uid,
-        "is_specialist": is_specialist,
-        "timestamp": get_current_time().isoformat()
-    })
-    c.execute("UPDATE forum_questions SET answers = ? WHERE id = ?", (json.dumps(answers), qid))
-    conn.commit()
-    conn.close()
-
-def update_forum_status(qid, status):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("UPDATE forum_questions SET status = ? WHERE id = ?", (status, qid))
-    conn.commit()
-    conn.close()
 
 # =============================================================
 # إدارة الجلسة
