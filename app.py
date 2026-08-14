@@ -127,7 +127,7 @@ def add_private_message(sender, sender_email, recipient, text, image_url=None, v
     now = get_current_time()
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("INSERT INTO private_messages (id, sender, sender_email, recipient, text, image_url, video_url, audio_url, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO private_messages (id, sender, sender_email, recipient, text, image_url, video_url, audio_url, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
               (mid, sender, sender_email, recipient, text, image_url, video_url, audio_url, now))
     conn.commit()
     conn.close()
@@ -135,15 +135,16 @@ def add_private_message(sender, sender_email, recipient, text, image_url=None, v
 
 def create_user(email, password, name, role='doctor'):
     uid = generate_id()
+    email_cleaned = email.strip().lower()
     hashed = hash_password(password)
     now = get_current_time()
     conn = get_db_connection()
     c = conn.cursor()
     try:
         c.execute("INSERT INTO users (uid, name, email, password, role, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                  (uid, name, email, hashed, role, now))
+                  (uid, name, email_cleaned, hashed, role, now))
         c.execute("INSERT INTO members (email, name, role, online, joined_at) VALUES (?, ?, ?, ?, ?)",
-                  (email, name, role, 1, now))
+                  (email_cleaned, name, role, 1, now))
         conn.commit()
         return uid
     except sqlite3.IntegrityError:
@@ -152,7 +153,6 @@ def create_user(email, password, name, role='doctor'):
         conn.close()
 
 def authenticate(email, password):
-    # توحيد البريد الإلكتروني إلى حروف صغيرة لتجنب مشاكل المطابقة
     email_cleaned = email.strip().lower()
     hashed = hash_password(password)
     conn = get_db_connection()
@@ -169,9 +169,8 @@ def authenticate(email, password):
         return dict(user)
     return None
 
-
 # =============================================================
-# دالة تهيئة قاعدة البيانات (معرفة بعد الدوال المساعدة لتفادي الخطأ)
+# دالة تهيئة قاعدة البيانات
 # =============================================================
 def init_db():
     conn = get_db_connection()
@@ -216,8 +215,8 @@ def init_db():
     
     conn.commit()
 
-    owner_email = "Ndcdental2025@outlook.com"
-    c.execute("SELECT * FROM users WHERE email = ?", (owner_email,))
+    owner_email = "ndcdental2025@outlook.com"
+    c.execute("SELECT * FROM users WHERE LOWER(email) = ?", (owner_email,))
     if not c.fetchone():
         owner_uid = generate_id()
         owner_pass = hash_password("ndc2025")
@@ -230,7 +229,6 @@ def init_db():
     
     conn.close()
 
-# استدعاء تهيئة القاعدة بأمان هنا بعد تعريف جميع الدوال
 init_db()
 
 # =============================================================
