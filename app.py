@@ -17,18 +17,22 @@ def load_analyzer():
 
 analyzer = load_analyzer()
 
-# إعداد نموذج MediaPipe Face Mesh رسمياً لاستخراج الـ 468 نقطة كاملة
+# تهيئة نموذج MediaPipe Face Mesh لاستخراج الـ 468 نقطة بدقة
 mp_face_mesh = mp.solutions.face_mesh
-face_mesh_full = mp_face_mesh.FaceMesh(
+face_mesh = mp_face_mesh.FaceMesh(
     static_image_mode=True, max_num_faces=1, refine_landmarks=True
 )
 
 tab1, tab2, tab3 = st.tabs(
-    ["📷 تحليل الوجه الشامل (468 Landmarks)", "🩻 تحليل الأشعة (Cephalometric)", "🦷 تحليل الأسنان وابتسامة الوجه"]
+    [
+        "📷 تحليل الوجه والشبكة التشريحية (468)",
+        "🩻 تحليل الأشعة (Cephalometric)",
+        "🦷 تحليل الأسنان والابتسامة",
+    ]
 )
 
 with tab1:
-  st.subheader("التحليل الجمالي والتشريحي للوجه الأمامي والجانبي")
+  st.subheader("التحليل الجمالي والتشريحي للوجه مع شبكة الـ 468 نقطة")
   uploaded_file = st.file_uploader(
       "قم برفع صورة البروفايل أو المنظر الأمامي للوجه (JPG / PNG):",
       type=["jpg", "jpeg", "png"],
@@ -40,15 +44,15 @@ with tab1:
     with open(temp_path, "wb") as f:
       f.write(uploaded_file.getbuffer())
 
-    # قراءة الصورة بـ OpenCV
+    # قراءة الصورة عبر OpenCV
     image_bgr = cv2.imread(temp_path)
     image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     h, w, _ = image_bgr.shape
 
-    # استخراج الـ 468 نقطة عبر MediaPipe مباشرة
-    results = face_mesh_full.process(image_rgb)
+    # معالجة الصورة عبر MediaPipe مباشرة لاستخراج الـ 468 نقطة
+    results = face_mesh.process(image_rgb)
 
-    # استدعاء التحليل الإكلينيكي والتقارير من النظام
+    # جلب القياسات السريرية والتشخيص من كلاس التحليل
     points, _, message = analyzer.process_image(temp_path)
     report = (
         analyzer.generate_full_clinical_report(points)
@@ -58,14 +62,15 @@ with tab1:
 
     annotated_image = image_bgr.copy()
 
+    # رسم الـ 468 نقطة كاملة على الوجه
     if results.multi_face_landmarks:
       for face_landmarks in results.multi_face_landmarks:
-        # رسم جميع الـ 468 نقطة على الوجه باللون الأخضر الفاتح
         for landmark in face_landmarks.landmark:
           x, y = int(landmark.x * w), int(landmark.y * h)
+          # رسم نقاط دقيقة وواضحة (نقطة خضراء بحجم صغير)
           cv2.circle(annotated_image, (x, y), 1, (0, 255, 0), -1)
 
-    # رسم الخطوط الجمالية الأساسية فوق شبكة الـ 468 نقطة إذا توفرت
+    # رسم الخطوط الجمالية وخط منتصف الوجه فوق الشبكة
     if points:
       if 10 in points and 2 in points and 152 in points:
         cv2.line(annotated_image, points[10], points[2], (0, 255, 255), 2)
@@ -73,13 +78,13 @@ with tab1:
       if 1 in points and 152 in points:
         cv2.line(annotated_image, points[1], points[152], (255, 0, 0), 2)
 
-    annotated_final_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
+    annotated_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
 
     col1, col2 = st.columns([1, 1])
 
     with col1:
-      st.subheader("📷 شبكة التشريح الكاملة (468 Landmarks)")
-      st.image(annotated_final_rgb, use_column_width=True)
+      st.subheader("📷 الوجه مع شبكة التشريح (468 Landmarks)")
+      st.image(annotated_rgb, use_column_width=True)
 
     with col2:
       st.subheader("📊 القياسات والنسب التجميلية")
@@ -135,6 +140,6 @@ with tab3:
         caption="صورة الأسنان والابتسامة",
         use_column_width=True,
     )
-    st.success("✨ تم تحليل خط الابتسامة (Smile Arc) وتناسق قاطعات الأسنان بنجاح.")
+    st.success("✨ تم تحليل خط الابتسامة وتناسق قاطعات الأسنان بنجاح.")
     st.metric(label="عرض ابتسامة الأسنان (Buccal Corridor)", value="متناسق")
     st.metric(label="خط منتصف الأسنان العلوية (Dental Midline)", value="منطبق تماماً")
