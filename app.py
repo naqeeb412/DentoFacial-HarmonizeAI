@@ -14,7 +14,7 @@ import plotly.express as px
 import re
 from pathlib import Path
 
-# إعدادات الصفحة
+# إعدادات الصفحة (يجب أن تكون في الأعلى)
 st.set_page_config(
     page_title="Dentofacial HarmonizeAI™",
     page_icon="🦷",
@@ -437,6 +437,7 @@ def init_session():
         st.session_state.dsd_tooth_inserted = False
         st.session_state.captured_media = []
         st.session_state.patient_photos = {}
+        st.session_state.specialists = []
 
 init_session()
 
@@ -473,11 +474,637 @@ def logout_user():
     st.session_state.current_page = 'home'
 
 # =============================================================
-# واجهة Streamlit
+# واجهة Streamlit - دوال الصفحات
 # =============================================================
 
+def show_login():
+    st.title("🔐 تسجيل الدخول")
+    with st.form("login_form"):
+        email = st.text_input("البريد الإلكتروني")
+        password = st.text_input("كلمة المرور", type="password")
+        submitted = st.form_submit_button("دخول")
+        if submitted:
+            if login_user(email, password):
+                st.success("تم تسجيل الدخول بنجاح!")
+                st.rerun()
+            else:
+                st.error("البريد أو كلمة المرور غير صحيحة")
+
+def show_signup():
+    st.title("📝 إنشاء حساب جديد")
+    with st.form("signup_form"):
+        name = st.text_input("الاسم الكامل")
+        email = st.text_input("البريد الإلكتروني")
+        password = st.text_input("كلمة المرور", type="password")
+        confirm = st.text_input("تأكيد كلمة المرور", type="password")
+        role = st.selectbox("الدور", ["doctor", "patient", "specialist"])
+        submitted = st.form_submit_button("إنشاء حساب")
+        if submitted:
+            if password != confirm:
+                st.error("كلمة المرور غير متطابقة")
+            elif len(password) < 6:
+                st.error("كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+            else:
+                uid = create_user(email, password, name, role)
+                if uid:
+                    st.success("تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.")
+                else:
+                    st.error("البريد الإلكتروني مستخدم بالفعل")
+
+def show_home():
+    st.title("🦷 Dentofacial HarmonizeAI™")
+    st.markdown("### تشخيص دقيق بذكاء اصطناعي")
+    st.write("Naqeeb412 HarmonizeAI يدمج بين التصوير ثلاثي الأبعاد، محاكاة الابتسامة، وتحليل الوجه لنتائج علاجية استثنائية.")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🧑‍⚕️ مرضى", "5K+")
+    col2.metric("🎯 دقة التشخيص", "98%")
+    col3.metric("🕒 دعم", "24/7")
+    st.info("💡 اختر من القائمة الجانبية للبدء.")
+
+def show_dashboard():
+    st.title("📊 لوحة التحكم")
+    user = st.session_state.user
+    st.write(f"👋 مرحباً **{user['name']}**")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("👨‍⚕️ المرضى", len(st.session_state.patients))
+    col2.metric("📅 مواعيد اليوم", np.random.randint(1, 10))
+    col3.metric("🧠 تشخيصات AI", np.random.randint(2, 15))
+    st.subheader("📋 آخر المرضى")
+    if st.session_state.patients:
+        df = pd.DataFrame(st.session_state.patients)
+        st.dataframe(df[['name', 'phone', 'age', 'gender']], use_container_width=True)
+    else:
+        st.write("لا يوجد مرضى.")
+
+def show_patients():
+    st.title("👨‍⚕️ قائمة المرضى")
+    if st.session_state.patients:
+        df = pd.DataFrame(st.session_state.patients)
+        st.dataframe(df[['name', 'phone', 'age', 'gender', 'notes']], use_container_width=True)
+        for p in st.session_state.patients:
+            with st.expander(f"👤 {p['name']}"):
+                st.write(f"الهاتف: {p['phone']}")
+                st.write(f"العمر: {p['age']}")
+                st.write(f"الجنس: {p['gender']}")
+                st.write(f"الملاحظات: {p['notes']}")
+                if st.button(f"حذف {p['name']}", key=f"del_{p['id']}"):
+                    delete_patient(p['id'])
+                    st.session_state.patients = get_patients()
+                    st.rerun()
+    else:
+        st.info("لا يوجد مرضى. أضف مريضاً جديداً.")
+
+def show_new_patient():
+    st.title("📝 إضافة مريض جديد")
+    with st.form("add_patient_form"):
+        name = st.text_input("الاسم الكامل")
+        phone = st.text_input("رقم الهاتف")
+        age = st.text_input("العمر")
+        gender = st.selectbox("الجنس", ["", "ذكر", "أنثى"])
+        notes = st.text_area("ملاحظات")
+        submitted = st.form_submit_button("حفظ المريض")
+        if submitted and name:
+            uid = st.session_state.user['uid']
+            add_patient(name, phone, age, gender, notes, uid)
+            st.session_state.patients = get_patients()
+            st.success("✅ تم إضافة المريض!")
+            st.rerun()
+        elif submitted:
+            st.error("الاسم مطلوب.")
+
+def show_members():
+    st.title("👥 أعضاء النظام")
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM members ORDER BY joined_at DESC")
+    members = c.fetchall()
+    conn.close()
+    if members:
+        for m in members:
+            with st.container():
+                col1, col2 = st.columns([1, 3])
+                with col1:
+                    st.image("https://via.placeholder.com/60", width=60)
+                with col2:
+                    st.write(f"**{m['name']}**")
+                    st.write(f"📧 {m['email']} | 🟢 {'متصل' if m['online'] else 'غير متصل'}")
+                st.divider()
+    else:
+        st.info("لا يوجد أعضاء.")
+
+def show_dentbook():
+    st.title("📱 Dentbook - الشبكة الاجتماعية الطبية")
+    with st.form("new_post_form"):
+        text = st.text_area("ماذا تفكر؟ شارك حالة طبية...")
+        image_file = st.file_uploader("صورة", type=["jpg", "jpeg", "png"])
+        video_file = st.file_uploader("فيديو", type=["mp4", "mov"])
+        submitted = st.form_submit_button("نشر")
+        if submitted and text:
+            image_url = None
+            video_url = None
+            if image_file:
+                image_url = "https://via.placeholder.com/300x200?text=Image"
+            if video_file:
+                video_url = "https://via.placeholder.com/300x200?text=Video"
+            user = st.session_state.user
+            add_dentbook_post(user['uid'], user['name'], "", user['email'], text, image_url, video_url)
+            st.session_state.dentbook_posts = get_dentbook_posts()
+            st.success("✅ تم النشر!")
+            st.rerun()
+    st.subheader("📰 المنشورات")
+    posts = st.session_state.dentbook_posts
+    if posts:
+        for p in posts:
+            with st.container():
+                st.write(f"**{p['author_name']}** - {p['timestamp']}")
+                st.write(p['text'])
+                if p['image_url']:
+                    st.image(p['image_url'], width=200)
+                if p['video_url']:
+                    st.video(p['video_url'])
+                st.caption(f"❤️ {len(json.loads(p['likes'] or '[]'))} إعجاب | 💬 {len(json.loads(p['comments'] or '[]'))} تعليق")
+                st.divider()
+    else:
+        st.info("لا توجد منشورات.")
+
+def show_dentbook_profile():
+    st.title("👤 الملف الشخصي")
+    user = st.session_state.user
+    st.write(f"**الاسم:** {user['name']}")
+    st.write(f"**البريد:** {user['email']}")
+    st.write(f"**التخصص:** {user.get('specialty', 'غير محدد')}")
+    st.write(f"**الدولة:** {user.get('country', 'غير محدد')}")
+    st.write(f"**الهاتف:** {user.get('phone', 'غير محدد')}")
+    st.write(f"**نبذة:** {user.get('bio', 'لا توجد')}")
+
+def show_messages():
+    st.title("💬 المراسلات العامة")
+    with st.container():
+        msg = st.text_input("اكتب رسالتك...")
+        if st.button("إرسال"):
+            if msg:
+                user = st.session_state.user
+                add_group_message(user['name'], user['email'], msg)
+                st.session_state.group_messages = get_group_messages()
+                st.rerun()
+    st.subheader("المحادثة")
+    for m in st.session_state.group_messages:
+        with st.chat_message(m['sender']):
+            st.write(m['text'])
+            if m['image_url']:
+                st.image(m['image_url'])
+            if m['video_url']:
+                st.video(m['video_url'])
+
+def show_private_messages():
+    st.title("💌 رسائل خاصة بين الأطباء")
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT email, name FROM members WHERE email != ?", (st.session_state.user['email'],))
+    doctors = c.fetchall()
+    conn.close()
+    if not doctors:
+        st.info("لا يوجد أطباء آخرون.")
+        return
+    target = st.selectbox("اختر الطبيب", [f"{d['name']} ({d['email']})" for d in doctors])
+    target_email = target.split("(")[-1].replace(")", "")
+    st.subheader(f"المحادثة مع {target_email}")
+    msgs = get_private_messages(st.session_state.user['email'])
+    for m in msgs:
+        if m['sender_email'] == st.session_state.user['email'] or m['recipient'] == target_email:
+            with st.chat_message(m['sender']):
+                st.write(m['text'])
+    new_msg = st.text_input("رسالة جديدة")
+    if st.button("إرسال خاص"):
+        if new_msg:
+            user = st.session_state.user
+            add_private_message(user['name'], user['email'], target_email, new_msg)
+            st.session_state.private_messages = get_private_messages(user['email'])
+            st.rerun()
+
+def show_lab_chat():
+    st.title("🧪 التواصل مع المختبر")
+    msg = st.text_input("رسالة للمختبر")
+    if st.button("إرسال"):
+        if msg:
+            user = st.session_state.user
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("INSERT INTO lab_messages (id, sender, sender_email, text, timestamp) VALUES (?, ?, ?, ?, ?)",
+                      (generate_id(), user['name'], user['email'], msg, get_current_time()))
+            conn.commit()
+            conn.close()
+            st.success("✅ تم الإرسال")
+            st.rerun()
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM lab_messages ORDER BY timestamp ASC")
+    lab_msgs = c.fetchall()
+    conn.close()
+    for m in lab_msgs:
+        with st.chat_message(m['sender']):
+            st.write(m['text'])
+
+def show_file_sharing():
+    st.title("📁 مشاركة الملفات")
+    uploaded = st.file_uploader("اختر ملفات", accept_multiple_files=True)
+    if uploaded:
+        for file in uploaded:
+            st.write(f"📄 {file.name} - {file.size} bytes")
+    st.subheader("الملفات المرفوعة")
+    if 'files_uploaded' in st.session_state:
+        for f in st.session_state.files_uploaded:
+            st.write(f"📄 {f['name']} - {f['size']} KB")
+    else:
+        st.info("لا توجد ملفات.")
+
+def show_diagnosis():
+    st.title("🩺 التشخيص الذكي")
+    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
+    doctor = st.text_input("الأخصائي")
+    symptoms = st.text_area("الأعراض")
+    if st.button("تشخيص AI - Harvard"):
+        if symptoms:
+            diagnosis = "ألم في المنطقة. التهاب لثة. سوء إطباق." if "ألم" in symptoms else "لا توجد أعراض واضحة."
+            st.success(f"✅ التشخيص: {diagnosis}")
+            st.info(f"التوصيات: فحص سريري، تنظيف عميق، تقويم أسنان.")
+        else:
+            st.warning("أدخل الأعراض أولاً.")
+
+def show_treatment_plan():
+    st.title("📋 خطة العلاج")
+    main = st.text_input("الخطة الرئيسية")
+    alt = st.text_input("الخطة البديلة")
+    if st.button("توليد الخطة"):
+        st.success("✅ تم توليد الخطة التفصيلية")
+        st.write("**التوصية النهائية:** اعتماد الخطة الرئيسية.")
+        st.write("نسبة النجاح: 95%، المدة: 18 شهر")
+
+def show_materials():
+    st.title("🧪 المواد العلاجية")
+    with st.form("add_material"):
+        name = st.text_input("اسم المادة")
+        usage = st.text_input("الاستخدام")
+        submitted = st.form_submit_button("إضافة")
+        if submitted and name and usage:
+            if 'materials' not in st.session_state:
+                st.session_state.materials = []
+            st.session_state.materials.append({"name": name, "usage": usage})
+            st.success("✅ تم الإضافة")
+    st.subheader("قائمة المواد")
+    for m in st.session_state.get('materials', []):
+        st.write(f"**{m['name']}** - {m['usage']}")
+
+def show_facial_analysis():
+    st.title("🧑‍⚕️ تحليل الوجه (478 علامة)")
+    uploaded = st.file_uploader("تحميل صورة للوجه", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        image = Image.open(uploaded)
+        st.image(image, caption="الصورة الأصلية", width=400)
+        if st.button("تحليل الوجه"):
+            st.success("✅ تم تحليل 478 نقطة تشريحية")
+            draw = ImageDraw.Draw(image)
+            for i in range(20):
+                x = np.random.randint(0, image.width)
+                y = np.random.randint(0, image.height)
+                draw.ellipse((x-3, y-3, x+3, y+3), fill="red")
+            st.image(image, caption="نتيجة التحليل", width=400)
+            st.write("النسبة الذهبية: 1.62، التناسق: 94%")
+
+def show_cephalometric():
+    st.title("🩻 تحليل الأشعة")
+    uploaded = st.file_uploader("تحميل صورة الأشعة", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        image = Image.open(uploaded)
+        st.image(image, caption="الأشعة الأصلية", width=400)
+        if st.button("تحليل الأشعة"):
+            st.success("✅ تم تحليل الزوايا")
+            draw = ImageDraw.Draw(image)
+            draw.line((10, 10, 200, 300), fill="blue", width=3)
+            draw.line((200, 10, 10, 300), fill="green", width=3)
+            st.image(image, caption="نتيجة التحليل", width=400)
+            data = pd.DataFrame({
+                "الزاوية": ["SNA", "SNB", "ANB"],
+                "قيمة المريض": [82, 80, 2],
+                "القيمة الطبيعية": [82, 80, 2],
+                "الحالة": ["طبيعي", "طبيعي", "طبيعي"]
+            })
+            st.table(data)
+
+def show_smile_design():
+    st.title("😁 تصميم الابتسامة")
+    uploaded = st.file_uploader("تحميل صورة الوجه", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        image = Image.open(uploaded)
+        st.image(image, caption="الصورة الأصلية", width=400)
+        if st.button("محاكاة الابتسامة"):
+            st.success("✅ تم تطبيق تصميم الابتسامة")
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((100, 200, 300, 280), fill="white")
+            st.image(image, caption="الابتسامة الجديدة", width=400)
+            st.write("نسبة التحسن المتوقعة: 92%")
+
+def show_aesthetic_design():
+    st.title("🎨 التصميم التجميلي (قبل / بعد)")
+    uploaded = st.file_uploader("تحميل صورة", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        original = Image.open(uploaded)
+        st.image(original, caption="قبل", width=300)
+        if st.button("محاكاة"):
+            modified = original.copy()
+            draw = ImageDraw.Draw(modified)
+            draw.rectangle((50, 50, 200, 200), fill=(255, 200, 200))
+            st.image(modified, caption="بعد", width=300)
+            st.success("✅ تم إنشاء المقارنة")
+
+def show_stl():
+    st.title("📦 نماذج 3D / Mesh")
+    uploaded = st.file_uploader("رفع ملف STL/OBJ", type=["stl", "obj"])
+    if uploaded:
+        st.success(f"✅ تم رفع {uploaded.name}")
+        fig = go.Figure(data=[go.Scatter3d(x=[0,1,2,3], y=[0,1,0,1], z=[0,1,2,1], mode='markers')])
+        fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
+        st.plotly_chart(fig, use_container_width=True)
+
+def show_dsd_studio():
+    st.title("🧬 استوديو إعادة بناء الابتسامة الطبيعية")
+    uploaded = st.file_uploader("تحميل صورة المريض", type=["jpg", "jpeg", "png"])
+    if uploaded:
+        image = Image.open(uploaded)
+        st.image(image, caption="الصورة الأصلية", width=400)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("إدراج سن طبيعي"):
+                draw = ImageDraw.Draw(image)
+                draw.ellipse((150, 200, 200, 280), fill=(230, 200, 180))
+                st.image(image, caption="بعد الإدراج", width=400)
+        with col2:
+            if st.button("تصفية عيوب الوجه"):
+                draw = ImageDraw.Draw(image)
+                draw.rectangle((50, 50, 100, 100), fill=(200, 200, 200))
+                st.image(image, caption="بعد التصفية", width=400)
+
+def show_global_platform():
+    st.title("🌍 المنصة العالمية")
+    st.write("🔄 خط سير المعالجة والإنتاج المدمج")
+    steps = st.session_state.pipeline_data
+    cols = st.columns(len(steps))
+    for i, (key, step) in enumerate(steps.items()):
+        with cols[i]:
+            st.write(f"**الخطوة {key}**")
+            st.write(step['name'])
+            st.progress(step['progress']/100)
+            st.caption(step['status'])
+
+def show_pipeline():
+    st.title("🔄 خط الإنتاج المدمج")
+    patient = st.selectbox("اختر مريضاً", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
+    st.write("تفاصيل خط الإنتاج للمريض المختار")
+    st.progress(0.58)
+    st.write("الخطوة 1: ✅ مكتمل")
+    st.write("الخطوة 2: ✅ مكتمل")
+    st.write("الخطوة 3: ⏳ قيد التنفيذ (60%)")
+    st.write("الخطوة 4: ⏳ قيد التنفيذ (30%)")
+    st.write("الخطوة 5: ⏸️ في الانتظار")
+
+def show_api_hub():
+    st.title("🔌 مركز تواصل الأنظمة")
+    st.write("Exocad: 🟢 متصل")
+    st.write("Meshy AI: 🟢 متصل")
+    st.write("Blender: 🟡 متزامن")
+    st.write("AI Studios: 🟢 متصل")
+    if st.button("مزامنة جميع الأنظمة"):
+        st.success("✅ تمت المزامنة")
+
+def show_materials_guide():
+    st.title("🦷 دليل المواد الطبية التجميلية")
+    data = pd.DataFrame({
+        "المادة": ["Lithium Disilicate", "Hyaluronic Acid", "Botulinum Toxin", "Zirconia"],
+        "التصنيف": ["قشور", "فيلر", "تعديل", "جسور"],
+        "البروتوكول": ["تحضير مجهري", "حقن", "حقن", "تحضير هيكلي"]
+    })
+    st.table(data)
+
+def show_notifications():
+    st.title("🔔 الإشعارات")
+    st.info("لا توجد إشعارات جديدة.")
+
+def show_systems():
+    st.title("🖥️ الأنظمة المستخدمة")
+    systems = ["Smile Generator", "Exocad Analysis", "Exocad 3D", "Meshy AI", "Blender Cycles", "AI Studios"]
+    for s in systems:
+        st.write(f"✅ {s} (نشط)")
+
+def show_scientific_scan():
+    st.title("🔬 المسح العلمي الشامل")
+    if st.button("مسح الوجه"):
+        st.success("✅ اكتمل مسح الوجه (478 نقطة)")
+    if st.button("مسح الأسنان"):
+        st.success("✅ اكتمل مسح الأسنان (32 سن)")
+    if st.button("تحليل التناغم"):
+        st.success("✅ اكتمل تحليل التناغم")
+    if st.button("تقرير علمي"):
+        st.success("✅ تم توليد التقرير")
+
+def show_naqai():
+    st.title("🤖 NaqAI المساعد الذكي")
+    question = st.text_input("اسأل NaqAI...")
+    if st.button("إرسال"):
+        if question:
+            st.write("🧠 شكراً لسؤالك! هذا هو رد المساعد الذكي.")
+            st.write("يمكنني مساعدتك في تصميم الابتسامة، تحليل الوجه، المواد الطبية، وغيرها.")
+
+def show_interdisciplinary():
+    st.title("🧑‍⚕️ فرق متعددة التخصصات")
+    with st.form("add_specialist"):
+        name = st.text_input("اسم الأخصائي")
+        specialty = st.text_input("التخصص")
+        submitted = st.form_submit_button("إضافة")
+        if submitted and name and specialty:
+            if 'specialists' not in st.session_state:
+                st.session_state.specialists = []
+            st.session_state.specialists.append({"name": name, "specialty": specialty})
+            st.success("✅ تم الإضافة")
+    st.subheader("الأخصائيون")
+    for s in st.session_state.get('specialists', []):
+        st.write(f"**{s['name']}** - {s['specialty']}")
+
+def show_ads():
+    st.title("📢 الإعلانات")
+    with st.form("new_ad"):
+        title = st.text_input("عنوان الإعلان")
+        content = st.text_area("المحتوى")
+        target = st.selectbox("الجمهور المستهدف", ["الجميع", "الأطباء", "المرضى"])
+        submitted = st.form_submit_button("نشر")
+        if submitted and title and content:
+            st.success("✅ تم نشر الإعلان")
+    st.subheader("الإعلانات المنشورة")
+    st.info("لا توجد إعلانات.")
+
+def show_lab():
+    st.title("🔬 حساب المعمل")
+    with st.form("lab_order"):
+        tech = st.text_input("اسم الفني")
+        work = st.text_input("نوع العمل")
+        patient = st.text_input("اسم المريض")
+        amount = st.number_input("المبلغ الكلي ($)", min_value=0.0)
+        submitted = st.form_submit_button("حفظ")
+        if submitted and tech and work:
+            if 'lab_orders' not in st.session_state:
+                st.session_state.lab_orders = []
+            st.session_state.lab_orders.append({"tech": tech, "work": work, "patient": patient, "amount": amount})
+            st.success("✅ تم حفظ الطلب")
+    st.subheader("طلبات المعمل")
+    for o in st.session_state.get('lab_orders', []):
+        st.write(f"{o['work']} - {o['tech']} (المريض: {o['patient']})")
+
+def show_appointments():
+    st.title("📅 المواعيد")
+    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
+    date = st.date_input("التاريخ")
+    time = st.time_input("الوقت")
+    if st.button("جدولة"):
+        st.success(f"✅ تم جدولة موعد للمريض {patient} في {date} {time}")
+
+def show_accounting():
+    st.title("💰 حساب المريض")
+    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
+    total = st.number_input("المبلغ الكلي", min_value=0.0)
+    paid = st.number_input("المدفوع", min_value=0.0)
+    if st.button("تحديث"):
+        st.success(f"✅ المتبقي: {total - paid}")
+
+def show_payments():
+    st.title("💳 الدفع والمحفظة")
+    st.subheader("وسائل الدفع المتاحة")
+    for m in st.session_state.payment_methods:
+        st.write(f"{m['name']} - {'🟢 مفعلة' if m['enabled'] else '🔴 غير مفعلة'}")
+    if st.button("تنفيذ الدفع"):
+        st.success("✅ تم تنفيذ الدفع بنجاح")
+
+def show_subscriptions():
+    st.title("👑 خطط الاشتراك")
+    plans = [
+        {"name": "تجريبي", "price": 0, "features": ["3 مرضى"]},
+        {"name": "شهري", "price": 99, "features": ["غير محدود", "تحليل AI"]},
+        {"name": "سنوي", "price": 999, "features": ["جميع الميزات"]}
+    ]
+    for p in plans:
+        with st.container():
+            st.write(f"### {p['name']}")
+            st.write(f"السعر: {p['price']} دولار")
+            st.write("الميزات: " + ", ".join(p['features']))
+            if st.button(f"اشتراك {p['name']}", key=p['name']):
+                st.success(f"✅ تم تفعيل الاشتراك {p['name']}")
+
+def show_invite():
+    st.title("📨 دعوة الأطباء")
+    if st.button("إنشاء رابط دعوة"):
+        invite_link = "https://harmonizeai.vercel.app?ref=invite_12345"
+        st.code(invite_link)
+        st.success("✅ تم إنشاء الرابط")
+    if st.button("نسخ الرابط"):
+        st.info("تم النسخ إلى الحافظة (محاكاة)")
+
+def show_settings():
+    st.title("⚙️ الإعدادات والخصوصية")
+    user = st.session_state.user
+    with st.form("settings_form"):
+        name = st.text_input("الاسم", value=user['name'])
+        specialty = st.text_input("التخصص", value=user.get('specialty', ''))
+        country = st.text_input("الدولة", value=user.get('country', ''))
+        phone = st.text_input("الهاتف", value=user.get('phone', ''))
+        bio = st.text_area("نبذة", value=user.get('bio', ''))
+        submitted = st.form_submit_button("حفظ")
+        if submitted:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("UPDATE users SET name=?, specialty=?, country=?, phone=?, bio=? WHERE uid=?",
+                      (name, specialty, country, phone, bio, user['uid']))
+            conn.commit()
+            conn.close()
+            st.session_state.user['name'] = name
+            st.session_state.user['specialty'] = specialty
+            st.session_state.user['country'] = country
+            st.session_state.user['phone'] = phone
+            st.session_state.user['bio'] = bio
+            st.success("✅ تم حفظ الإعدادات")
+    if st.button("تغيير كلمة المرور"):
+        st.info("سيتم إرسال رابط لإعادة تعيين كلمة المرور (محاكاة)")
+
+def show_reports():
+    st.title("📄 التقارير")
+    if st.button("توليد تقرير"):
+        st.success("✅ تم توليد التقرير")
+        st.download_button("تحميل PDF", data="محتوى التقرير", file_name="report.pdf", mime="application/pdf")
+
+def show_photography():
+    st.title("📸 التصوير")
+    img = st.camera_input("التقاط صورة")
+    if img:
+        st.image(img, caption="الصورة الملتقطة", width=300)
+        st.success("✅ تم حفظ الصورة")
+
+def show_privacy():
+    st.title("🔒 الخصوصية والأمان")
+    st.write("سياسة الخصوصية: نلتزم بحماية بياناتك الشخصية. جميع المعلومات تخزن بشكل آمن.")
+
+def show_ip():
+    st.title("©️ حقوق الملكية الفكرية")
+    st.write("جميع المحتويات محمية بموجب حقوق النشر والعلامات التجارية.")
+
+def show_cadcam():
+    st.title("⚙️ CAD/CAM & 3D")
+    st.write("عرض نموذج ثلاثي الأبعاد افتراضي")
+    fig = go.Figure(data=[go.Mesh3d(x=[0,1,2,0], y=[0,0,0,1], z=[0,0,1,0], color='gold', opacity=0.8)])
+    st.plotly_chart(fig, use_container_width=True)
+    if st.button("تحليل النموذج"):
+        st.success("✅ تحليل النموذج مكتمل")
+        st.write("عدد المضلعات: 32 سن")
+        st.write("الحالة: جاهز")
+
+def show_forum():
+    st.title("🗣️ منتدى النقاشات مع الأخصائيين")
+    st.subheader("الأسئلة المنشورة")
+    for q in st.session_state.forum_questions:
+        with st.expander(f"📌 {q['title']}"):
+            st.write(q['body'])
+            st.caption(f"سؤال من {q['asked_by']} - الحالة: {q['status']}")
+            answers = json.loads(q.get('answers', '[]'))
+            if answers:
+                for a in answers:
+                    st.write(f"**{a['author']}**: {a['text']}")
+            with st.form(key=f"reply_{q['id']}"):
+                reply = st.text_input("ردك")
+                if st.form_submit_button("رد"):
+                    if reply:
+                        user = st.session_state.user
+                        is_specialist = user['role'] == 'specialist' or user['role'] == 'owner'
+                        add_forum_answer(q['id'], reply, user['name'], user['uid'], is_specialist)
+                        st.session_state.forum_questions = get_forum_questions()
+                        st.rerun()
+            if st.session_state.user['role'] in ['specialist', 'owner']:
+                if st.button(f"غلق السؤال", key=f"close_{q['id']}"):
+                    update_forum_status(q['id'], 'closed')
+                    st.session_state.forum_questions = get_forum_questions()
+                    st.rerun()
+    with st.form("new_question"):
+        title = st.text_input("عنوان السؤال")
+        body = st.text_area("التفاصيل")
+        target = st.selectbox("توجيه إلى", ["جميع الأخصائيين"] + [d['name'] for d in st.session_state.get('specialists', [])])
+        if st.form_submit_button("نشر السؤال"):
+            if title and body:
+                user = st.session_state.user
+                add_forum_question(title, body, user['name'], user['uid'], target)
+                st.session_state.forum_questions = get_forum_questions()
+                st.success("✅ تم نشر السؤال")
+                st.rerun()
+
+# =============================================================
+# الدالة الرئيسية للتطبيق
+# =============================================================
 def main():
-    # العنوان الجانبي
+    # القائمة الجانبية
     with st.sidebar:
         st.image("https://via.placeholder.com/150x80?text=HarmonizeAI", use_column_width=True)
         st.title("🦷 HarmonizeAI")
@@ -490,7 +1117,6 @@ def main():
                 logout_user()
                 st.rerun()
             st.divider()
-            # قائمة الصفحات
             pages = {
                 "الرئيسية": "home",
                 "لوحة التحكم": "dashboard",
@@ -649,662 +1275,7 @@ def main():
         st.write("الصفحة غير موجودة")
 
 # =============================================================
-# صفحات التطبيق
-# =============================================================
-
-def show_login():
-    st.title("🔐 تسجيل الدخول")
-    with st.form("login_form"):
-        email = st.text_input("البريد الإلكتروني")
-        password = st.text_input("كلمة المرور", type="password")
-        submitted = st.form_submit_button("دخول")
-        if submitted:
-            if login_user(email, password):
-                st.success("تم تسجيل الدخول بنجاح!")
-                st.rerun()
-            else:
-                st.error("البريد أو كلمة المرور غير صحيحة")
-
-def show_signup():
-    st.title("📝 إنشاء حساب جديد")
-    with st.form("signup_form"):
-        name = st.text_input("الاسم الكامل")
-        email = st.text_input("البريد الإلكتروني")
-        password = st.text_input("كلمة المرور", type="password")
-        confirm = st.text_input("تأكيد كلمة المرور", type="password")
-        role = st.selectbox("الدور", ["doctor", "patient", "specialist"])
-        submitted = st.form_submit_button("إنشاء حساب")
-        if submitted:
-            if password != confirm:
-                st.error("كلمة المرور غير متطابقة")
-            elif len(password) < 6:
-                st.error("كلمة المرور يجب أن تكون 6 أحرف على الأقل")
-            else:
-                uid = create_user(email, password, name, role)
-                if uid:
-                    st.success("تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.")
-                else:
-                    st.error("البريد الإلكتروني مستخدم بالفعل")
-
-def show_home():
-    st.title("🦷 Dentofacial HarmonizeAI™")
-    st.markdown("### تشخيص دقيق بذكاء اصطناعي")
-    st.write("Naqeeb412 HarmonizeAI يدمج بين التصوير ثلاثي الأبعاد، محاكاة الابتسامة، وتحليل الوجه لنتائج علاجية استثنائية.")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("🧑‍⚕️ مرضى", "5K+")
-    col2.metric("🎯 دقة التشخيص", "98%")
-    col3.metric("🕒 دعم", "24/7")
-    st.info("💡 اختر من القائمة الجانبية للبدء.")
-
-def show_dashboard():
-    st.title("📊 لوحة التحكم")
-    user = st.session_state.user
-    st.write(f"👋 مرحباً **{user['name']}**")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("👨‍⚕️ المرضى", len(st.session_state.patients))
-    col2.metric("📅 مواعيد اليوم", np.random.randint(1, 10))
-    col3.metric("🧠 تشخيصات AI", np.random.randint(2, 15))
-    st.subheader("📋 آخر المرضى")
-    if st.session_state.patients:
-        df = pd.DataFrame(st.session_state.patients)
-        st.dataframe(df[['name', 'phone', 'age', 'gender']], use_container_width=True)
-    else:
-        st.write("لا يوجد مرضى.")
-
-def show_patients():
-    st.title("👨‍⚕️ قائمة المرضى")
-    if st.session_state.patients:
-        df = pd.DataFrame(st.session_state.patients)
-        st.dataframe(df[['name', 'phone', 'age', 'gender', 'notes']], use_container_width=True)
-        for p in st.session_state.patients:
-            with st.expander(f"👤 {p['name']}"):
-                st.write(f"الهاتف: {p['phone']}")
-                st.write(f"العمر: {p['age']}")
-                st.write(f"الجنس: {p['gender']}")
-                st.write(f"الملاحظات: {p['notes']}")
-                if st.button(f"حذف {p['name']}", key=f"del_{p['id']}"):
-                    delete_patient(p['id'])
-                    st.session_state.patients = get_patients()
-                    st.rerun()
-    else:
-        st.info("لا يوجد مرضى. أضف مريضاً جديداً.")
-
-def show_new_patient():
-    st.title("📝 إضافة مريض جديد")
-    with st.form("add_patient_form"):
-        name = st.text_input("الاسم الكامل")
-        phone = st.text_input("رقم الهاتف")
-        age = st.text_input("العمر")
-        gender = st.selectbox("الجنس", ["", "ذكر", "أنثى"])
-        notes = st.text_area("ملاحظات")
-        submitted = st.form_submit_button("حفظ المريض")
-        if submitted and name:
-            uid = st.session_state.user['uid']
-            add_patient(name, phone, age, gender, notes, uid)
-            st.session_state.patients = get_patients()
-            st.success("✅ تم إضافة المريض!")
-            st.rerun()
-        elif submitted:
-            st.error("الاسم مطلوب.")
-
-def show_members():
-    st.title("👥 أعضاء النظام")
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM members ORDER BY joined_at DESC")
-    members = c.fetchall()
-    conn.close()
-    if members:
-        for m in members:
-            with st.container():
-                col1, col2 = st.columns([1, 3])
-                with col1:
-                    st.image("https://via.placeholder.com/60", width=60)
-                with col2:
-                    st.write(f"**{m['name']}**")
-                    st.write(f"📧 {m['email']} | 🟢 {'متصل' if m['online'] else 'غير متصل'}")
-                st.divider()
-    else:
-        st.info("لا يوجد أعضاء.")
-
-def show_dentbook():
-    st.title("📱 Dentbook - الشبكة الاجتماعية الطبية")
-    # نموذج نشر جديد
-    with st.form("new_post_form"):
-        text = st.text_area("ماذا تفكر؟ شارك حالة طبية...")
-        image_file = st.file_uploader("صورة", type=["jpg", "jpeg", "png"])
-        video_file = st.file_uploader("فيديو", type=["mp4", "mov"])
-        submitted = st.form_submit_button("نشر")
-        if submitted and text:
-            # رفع الصورة/الفيديو (محاكاة)
-            image_url = None
-            video_url = None
-            if image_file:
-                image_url = "https://via.placeholder.com/300x200?text=Image"
-            if video_file:
-                video_url = "https://via.placeholder.com/300x200?text=Video"
-            user = st.session_state.user
-            add_dentbook_post(user['uid'], user['name'], "", user['email'], text, image_url, video_url)
-            st.session_state.dentbook_posts = get_dentbook_posts()
-            st.success("✅ تم النشر!")
-            st.rerun()
-
-    # عرض المنشورات
-    st.subheader("📰 المنشورات")
-    posts = st.session_state.dentbook_posts
-    if posts:
-        for p in posts:
-            with st.container():
-                st.write(f"**{p['author_name']}** - {p['timestamp']}")
-                st.write(p['text'])
-                if p['image_url']:
-                    st.image(p['image_url'], width=200)
-                if p['video_url']:
-                    st.video(p['video_url'])
-                st.caption(f"❤️ {len(json.loads(p['likes'] or '[]'))} إعجاب | 💬 {len(json.loads(p['comments'] or '[]'))} تعليق")
-                st.divider()
-    else:
-        st.info("لا توجد منشورات.")
-
-def show_dentbook_profile():
-    st.title("👤 الملف الشخصي")
-    user = st.session_state.user
-    st.write(f"**الاسم:** {user['name']}")
-    st.write(f"**البريد:** {user['email']}")
-    st.write(f"**التخصص:** {user.get('specialty', 'غير محدد')}")
-    st.write(f"**الدولة:** {user.get('country', 'غير محدد')}")
-    st.write(f"**الهاتف:** {user.get('phone', 'غير محدد')}")
-    st.write(f"**نبذة:** {user.get('bio', 'لا توجد')}")
-
-def show_messages():
-    st.title("💬 المراسلات العامة")
-    with st.container():
-        msg = st.text_input("اكتب رسالتك...")
-        if st.button("إرسال"):
-            if msg:
-                user = st.session_state.user
-                add_group_message(user['name'], user['email'], msg)
-                st.session_state.group_messages = get_group_messages()
-                st.rerun()
-    st.subheader("المحادثة")
-    for m in st.session_state.group_messages:
-        with st.chat_message(m['sender']):
-            st.write(m['text'])
-            if m['image_url']:
-                st.image(m['image_url'])
-            if m['video_url']:
-                st.video(m['video_url'])
-
-def show_private_messages():
-    st.title("💌 رسائل خاصة بين الأطباء")
-    # قائمة الأطباء (من members)
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT email, name FROM members WHERE email != ?", (st.session_state.user['email'],))
-    doctors = c.fetchall()
-    conn.close()
-    if not doctors:
-        st.info("لا يوجد أطباء آخرون.")
-        return
-    target = st.selectbox("اختر الطبيب", [f"{d['name']} ({d['email']})" for d in doctors])
-    target_email = target.split("(")[-1].replace(")", "")
-
-    # عرض الرسائل الخاصة
-    st.subheader(f"المحادثة مع {target_email}")
-    msgs = get_private_messages(st.session_state.user['email'])
-    for m in msgs:
-        if m['sender_email'] == st.session_state.user['email'] or m['recipient'] == target_email:
-            with st.chat_message(m['sender']):
-                st.write(m['text'])
-    # إرسال رسالة
-    new_msg = st.text_input("رسالة جديدة")
-    if st.button("إرسال خاص"):
-        if new_msg:
-            user = st.session_state.user
-            add_private_message(user['name'], user['email'], target_email, new_msg)
-            st.session_state.private_messages = get_private_messages(user['email'])
-            st.rerun()
-
-def show_lab_chat():
-    st.title("🧪 التواصل مع المختبر")
-    msg = st.text_input("رسالة للمختبر")
-    if st.button("إرسال"):
-        if msg:
-            user = st.session_state.user
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("INSERT INTO lab_messages (id, sender, sender_email, text, timestamp) VALUES (?, ?, ?, ?, ?)",
-                      (generate_id(), user['name'], user['email'], msg, get_current_time()))
-            conn.commit()
-            conn.close()
-            st.success("✅ تم الإرسال")
-            st.rerun()
-    # عرض الرسائل
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM lab_messages ORDER BY timestamp ASC")
-    lab_msgs = c.fetchall()
-    conn.close()
-    for m in lab_msgs:
-        with st.chat_message(m['sender']):
-            st.write(m['text'])
-
-def show_file_sharing():
-    st.title("📁 مشاركة الملفات")
-    uploaded = st.file_uploader("اختر ملفات", accept_multiple_files=True)
-    if uploaded:
-        for file in uploaded:
-            st.write(f"📄 {file.name} - {file.size} bytes")
-    # عرض الملفات المحفوظة
-    st.subheader("الملفات المرفوعة")
-    if 'files_uploaded' in st.session_state:
-        for f in st.session_state.files_uploaded:
-            st.write(f"📄 {f['name']} - {f['size']} KB")
-    else:
-        st.info("لا توجد ملفات.")
-
-def show_diagnosis():
-    st.title("🩺 التشخيص الذكي")
-    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
-    doctor = st.text_input("الأخصائي")
-    symptoms = st.text_area("الأعراض")
-    if st.button("تشخيص AI - Harvard"):
-        if symptoms:
-            # محاكاة تشخيص
-            diagnosis = "ألم في المنطقة. التهاب لثة. سوء إطباق." if "ألم" in symptoms else "لا توجد أعراض واضحة."
-            st.success(f"✅ التشخيص: {diagnosis}")
-            st.info(f"التوصيات: فحص سريري، تنظيف عميق، تقويم أسنان.")
-        else:
-            st.warning("أدخل الأعراض أولاً.")
-
-def show_treatment_plan():
-    st.title("📋 خطة العلاج")
-    main = st.text_input("الخطة الرئيسية")
-    alt = st.text_input("الخطة البديلة")
-    if st.button("توليد الخطة"):
-        st.success("✅ تم توليد الخطة التفصيلية")
-        st.write("**التوصية النهائية:** اعتماد الخطة الرئيسية.")
-        st.write("نسبة النجاح: 95%، المدة: 18 شهر")
-
-def show_materials():
-    st.title("🧪 المواد العلاجية")
-    with st.form("add_material"):
-        name = st.text_input("اسم المادة")
-        usage = st.text_input("الاستخدام")
-        submitted = st.form_submit_button("إضافة")
-        if submitted and name and usage:
-            if 'materials' not in st.session_state:
-                st.session_state.materials = []
-            st.session_state.materials.append({"name": name, "usage": usage})
-            st.success("✅ تم الإضافة")
-    st.subheader("قائمة المواد")
-    for m in st.session_state.get('materials', []):
-        st.write(f"**{m['name']}** - {m['usage']}")
-
-def show_facial_analysis():
-    st.title("🧑‍⚕️ تحليل الوجه (478 علامة)")
-    uploaded = st.file_uploader("تحميل صورة للوجه", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        image = Image.open(uploaded)
-        st.image(image, caption="الصورة الأصلية", width=400)
-        if st.button("تحليل الوجه"):
-            # محاكاة تحليل
-            st.success("✅ تم تحليل 478 نقطة تشريحية")
-            # رسم نقاط افتراضية على الصورة
-            draw = ImageDraw.Draw(image)
-            for i in range(20):
-                x = np.random.randint(0, image.width)
-                y = np.random.randint(0, image.height)
-                draw.ellipse((x-3, y-3, x+3, y+3), fill="red")
-            st.image(image, caption="نتيجة التحليل", width=400)
-            st.write("النسبة الذهبية: 1.62، التناسق: 94%")
-
-def show_cephalometric():
-    st.title("🩻 تحليل الأشعة")
-    uploaded = st.file_uploader("تحميل صورة الأشعة", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        image = Image.open(uploaded)
-        st.image(image, caption="الأشعة الأصلية", width=400)
-        if st.button("تحليل الأشعة"):
-            st.success("✅ تم تحليل الزوايا")
-            # رسم خطوط وزوايا
-            draw = ImageDraw.Draw(image)
-            # خطوط عشوائية
-            draw.line((10, 10, 200, 300), fill="blue", width=3)
-            draw.line((200, 10, 10, 300), fill="green", width=3)
-            st.image(image, caption="نتيجة التحليل", width=400)
-            data = pd.DataFrame({
-                "الزاوية": ["SNA", "SNB", "ANB"],
-                "قيمة المريض": [82, 80, 2],
-                "القيمة الطبيعية": [82, 80, 2],
-                "الحالة": ["طبيعي", "طبيعي", "طبيعي"]
-            })
-            st.table(data)
-
-def show_smile_design():
-    st.title("😁 تصميم الابتسامة")
-    uploaded = st.file_uploader("تحميل صورة الوجه", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        image = Image.open(uploaded)
-        st.image(image, caption="الصورة الأصلية", width=400)
-        if st.button("محاكاة الابتسامة"):
-            st.success("✅ تم تطبيق تصميم الابتسامة")
-            # تعديل الصورة (مثال: إضافة أسنان بيضاء)
-            draw = ImageDraw.Draw(image)
-            draw.rectangle((100, 200, 300, 280), fill="white")
-            st.image(image, caption="الابتسامة الجديدة", width=400)
-            st.write("نسبة التحسن المتوقعة: 92%")
-
-def show_aesthetic_design():
-    st.title("🎨 التصميم التجميلي (قبل / بعد)")
-    uploaded = st.file_uploader("تحميل صورة", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        original = Image.open(uploaded)
-        st.image(original, caption="قبل", width=300)
-        if st.button("محاكاة"):
-            # تعديل الصورة (محاكاة)
-            modified = original.copy()
-            draw = ImageDraw.Draw(modified)
-            draw.rectangle((50, 50, 200, 200), fill=(255, 200, 200))
-            st.image(modified, caption="بعد", width=300)
-            st.success("✅ تم إنشاء المقارنة")
-
-def show_stl():
-    st.title("📦 نماذج 3D / Mesh")
-    uploaded = st.file_uploader("رفع ملف STL/OBJ", type=["stl", "obj"])
-    if uploaded:
-        st.success(f"✅ تم رفع {uploaded.name}")
-        # عرض نموذج ثلاثي الأبعاد باستخدام plotly
-        # محاكاة: عرض كرة 3D
-        fig = go.Figure(data=[go.Scatter3d(x=[0,1,2,3], y=[0,1,0,1], z=[0,1,2,1], mode='markers')])
-        fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))
-        st.plotly_chart(fig, use_container_width=True)
-
-def show_dsd_studio():
-    st.title("🧬 استوديو إعادة بناء الابتسامة الطبيعية")
-    uploaded = st.file_uploader("تحميل صورة المريض", type=["jpg", "jpeg", "png"])
-    if uploaded:
-        image = Image.open(uploaded)
-        st.image(image, caption="الصورة الأصلية", width=400)
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("إدراج سن طبيعي"):
-                draw = ImageDraw.Draw(image)
-                draw.ellipse((150, 200, 200, 280), fill=(230, 200, 180))
-                st.image(image, caption="بعد الإدراج", width=400)
-        with col2:
-            if st.button("تصفية عيوب الوجه"):
-                draw = ImageDraw.Draw(image)
-                draw.rectangle((50, 50, 100, 100), fill=(200, 200, 200))
-                st.image(image, caption="بعد التصفية", width=400)
-
-def show_global_platform():
-    st.title("🌍 المنصة العالمية")
-    st.write("🔄 خط سير المعالجة والإنتاج المدمج")
-    # عرض خطوات الإنتاج
-    steps = st.session_state.pipeline_data
-    cols = st.columns(len(steps))
-    for i, (key, step) in enumerate(steps.items()):
-        with cols[i]:
-            st.write(f"**الخطوة {key}**")
-            st.write(step['name'])
-            st.progress(step['progress']/100)
-            st.caption(step['status'])
-
-def show_pipeline():
-    st.title("🔄 خط الإنتاج المدمج")
-    patient = st.selectbox("اختر مريضاً", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
-    st.write("تفاصيل خط الإنتاج للمريض المختار")
-    # عرض تقدم خط الإنتاج
-    st.progress(0.58)
-    st.write("الخطوة 1: ✅ مكتمل")
-    st.write("الخطوة 2: ✅ مكتمل")
-    st.write("الخطوة 3: ⏳ قيد التنفيذ (60%)")
-    st.write("الخطوة 4: ⏳ قيد التنفيذ (30%)")
-    st.write("الخطوة 5: ⏸️ في الانتظار")
-
-def show_api_hub():
-    st.title("🔌 مركز تواصل الأنظمة")
-    st.write("Exocad: 🟢 متصل")
-    st.write("Meshy AI: 🟢 متصل")
-    st.write("Blender: 🟡 متزامن")
-    st.write("AI Studios: 🟢 متصل")
-    if st.button("مزامنة جميع الأنظمة"):
-        st.success("✅ تمت المزامنة")
-
-def show_materials_guide():
-    st.title("🦷 دليل المواد الطبية التجميلية")
-    data = pd.DataFrame({
-        "المادة": ["Lithium Disilicate", "Hyaluronic Acid", "Botulinum Toxin", "Zirconia"],
-        "التصنيف": ["قشور", "فيلر", "تعديل", "جسور"],
-        "البروتوكول": ["تحضير مجهري", "حقن", "حقن", "تحضير هيكلي"]
-    })
-    st.table(data)
-
-def show_notifications():
-    st.title("🔔 الإشعارات")
-    st.info("لا توجد إشعارات جديدة.")
-
-def show_systems():
-    st.title("🖥️ الأنظمة المستخدمة")
-    systems = ["Smile Generator", "Exocad Analysis", "Exocad 3D", "Meshy AI", "Blender Cycles", "AI Studios"]
-    for s in systems:
-        st.write(f"✅ {s} (نشط)")
-
-def show_scientific_scan():
-    st.title("🔬 المسح العلمي الشامل")
-    if st.button("مسح الوجه"):
-        st.success("✅ اكتمل مسح الوجه (478 نقطة)")
-    if st.button("مسح الأسنان"):
-        st.success("✅ اكتمل مسح الأسنان (32 سن)")
-    if st.button("تحليل التناغم"):
-        st.success("✅ اكتمل تحليل التناغم")
-    if st.button("تقرير علمي"):
-        st.success("✅ تم توليد التقرير")
-
-def show_naqai():
-    st.title("🤖 NaqAI المساعد الذكي")
-    question = st.text_input("اسأل NaqAI...")
-    if st.button("إرسال"):
-        if question:
-            # محاكاة إجابة
-            st.write("🧠 شكراً لسؤالك! هذا هو رد المساعد الذكي.")
-            st.write("يمكنني مساعدتك في تصميم الابتسامة، تحليل الوجه، المواد الطبية، وغيرها.")
-
-def show_interdisciplinary():
-    st.title("🧑‍⚕️ فرق متعددة التخصصات")
-    with st.form("add_specialist"):
-        name = st.text_input("اسم الأخصائي")
-        specialty = st.text_input("التخصص")
-        submitted = st.form_submit_button("إضافة")
-        if submitted and name and specialty:
-            if 'specialists' not in st.session_state:
-                st.session_state.specialists = []
-            st.session_state.specialists.append({"name": name, "specialty": specialty})
-            st.success("✅ تم الإضافة")
-    st.subheader("الأخصائيون")
-    for s in st.session_state.get('specialists', []):
-        st.write(f"**{s['name']}** - {s['specialty']}")
-
-def show_ads():
-    st.title("📢 الإعلانات")
-    with st.form("new_ad"):
-        title = st.text_input("عنوان الإعلان")
-        content = st.text_area("المحتوى")
-        target = st.selectbox("الجمهور المستهدف", ["الجميع", "الأطباء", "المرضى"])
-        submitted = st.form_submit_button("نشر")
-        if submitted and title and content:
-            st.success("✅ تم نشر الإعلان")
-    # عرض الإعلانات
-    st.subheader("الإعلانات المنشورة")
-    st.info("لا توجد إعلانات.")
-
-def show_lab():
-    st.title("🔬 حساب المعمل")
-    with st.form("lab_order"):
-        tech = st.text_input("اسم الفني")
-        work = st.text_input("نوع العمل")
-        patient = st.text_input("اسم المريض")
-        amount = st.number_input("المبلغ الكلي ($)", min_value=0.0)
-        submitted = st.form_submit_button("حفظ")
-        if submitted and tech and work:
-            if 'lab_orders' not in st.session_state:
-                st.session_state.lab_orders = []
-            st.session_state.lab_orders.append({"tech": tech, "work": work, "patient": patient, "amount": amount})
-            st.success("✅ تم حفظ الطلب")
-    st.subheader("طلبات المعمل")
-    for o in st.session_state.get('lab_orders', []):
-        st.write(f"{o['work']} - {o['tech']} (المريض: {o['patient']})")
-
-def show_appointments():
-    st.title("📅 المواعيد")
-    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
-    date = st.date_input("التاريخ")
-    time = st.time_input("الوقت")
-    if st.button("جدولة"):
-        st.success(f"✅ تم جدولة موعد للمريض {patient} في {date} {time}")
-
-def show_accounting():
-    st.title("💰 حساب المريض")
-    patient = st.selectbox("اختر المريض", [p['name'] for p in st.session_state.patients] if st.session_state.patients else ["لا يوجد"])
-    total = st.number_input("المبلغ الكلي", min_value=0.0)
-    paid = st.number_input("المدفوع", min_value=0.0)
-    if st.button("تحديث"):
-        st.success(f"✅ المتبقي: {total - paid}")
-
-def show_payments():
-    st.title("💳 الدفع والمحفظة")
-    st.subheader("وسائل الدفع المتاحة")
-    for m in st.session_state.payment_methods:
-        st.write(f"{m['name']} - {'🟢 مفعلة' if m['enabled'] else '🔴 غير مفعلة'}")
-    if st.button("تنفيذ الدفع"):
-        st.success("✅ تم تنفيذ الدفع بنجاح")
-
-def show_subscriptions():
-    st.title("👑 خطط الاشتراك")
-    plans = [
-        {"name": "تجريبي", "price": 0, "features": ["3 مرضى"]},
-        {"name": "شهري", "price": 99, "features": ["غير محدود", "تحليل AI"]},
-        {"name": "سنوي", "price": 999, "features": ["جميع الميزات"]}
-    ]
-    for p in plans:
-        with st.container():
-            st.write(f"### {p['name']}")
-            st.write(f"السعر: {p['price']} دولار")
-            st.write("الميزات: " + ", ".join(p['features']))
-            if st.button(f"اشتراك {p['name']}", key=p['name']):
-                st.success(f"✅ تم تفعيل الاشتراك {p['name']}")
-
-def show_invite():
-    st.title("📨 دعوة الأطباء")
-    if st.button("إنشاء رابط دعوة"):
-        invite_link = "https://harmonizeai.vercel.app?ref=invite_12345"
-        st.code(invite_link)
-        st.success("✅ تم إنشاء الرابط")
-    if st.button("نسخ الرابط"):
-        st.info("تم النسخ إلى الحافظة (محاكاة)")
-
-def show_settings():
-    st.title("⚙️ الإعدادات والخصوصية")
-    user = st.session_state.user
-    with st.form("settings_form"):
-        name = st.text_input("الاسم", value=user['name'])
-        specialty = st.text_input("التخصص", value=user.get('specialty', ''))
-        country = st.text_input("الدولة", value=user.get('country', ''))
-        phone = st.text_input("الهاتف", value=user.get('phone', ''))
-        bio = st.text_area("نبذة", value=user.get('bio', ''))
-        submitted = st.form_submit_button("حفظ")
-        if submitted:
-            # تحديث في قاعدة البيانات
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("UPDATE users SET name=?, specialty=?, country=?, phone=?, bio=? WHERE uid=?",
-                      (name, specialty, country, phone, bio, user['uid']))
-            conn.commit()
-            conn.close()
-            st.session_state.user['name'] = name
-            st.session_state.user['specialty'] = specialty
-            st.session_state.user['country'] = country
-            st.session_state.user['phone'] = phone
-            st.session_state.user['bio'] = bio
-            st.success("✅ تم حفظ الإعدادات")
-    if st.button("تغيير كلمة المرور"):
-        st.info("سيتم إرسال رابط لإعادة تعيين كلمة المرور (محاكاة)")
-
-def show_reports():
-    st.title("📄 التقارير")
-    if st.button("توليد تقرير"):
-        st.success("✅ تم توليد التقرير")
-        st.download_button("تحميل PDF", data="محتوى التقرير", file_name="report.pdf", mime="application/pdf")
-
-def show_photography():
-    st.title("📸 التصوير")
-    img = st.camera_input("التقاط صورة")
-    if img:
-        st.image(img, caption="الصورة الملتقطة", width=300)
-        st.success("✅ تم حفظ الصورة")
-
-def show_privacy():
-    st.title("🔒 الخصوصية والأمان")
-    st.write("سياسة الخصوصية: نلتزم بحماية بياناتك الشخصية. جميع المعلومات تخزن بشكل آمن.")
-
-def show_ip():
-    st.title("©️ حقوق الملكية الفكرية")
-    st.write("جميع المحتويات محمية بموجب حقوق النشر والعلامات التجارية.")
-
-def show_cadcam():
-    st.title("⚙️ CAD/CAM & 3D")
-    st.write("عرض نموذج ثلاثي الأبعاد افتراضي")
-    fig = go.Figure(data=[go.Mesh3d(x=[0,1,2,0], y=[0,0,0,1], z=[0,0,1,0], color='gold', opacity=0.8)])
-    st.plotly_chart(fig, use_container_width=True)
-    if st.button("تحليل النموذج"):
-        st.success("✅ تحليل النموذج مكتمل")
-        st.write("عدد المضلعات: 32 سن")
-        st.write("الحالة: جاهز")
-
-def show_forum():
-    st.title("🗣️ منتدى النقاشات مع الأخصائيين")
-    # عرض الأسئلة
-    st.subheader("الأسئلة المنشورة")
-    for q in st.session_state.forum_questions:
-        with st.expander(f"📌 {q['title']}"):
-            st.write(q['body'])
-            st.caption(f"سؤال من {q['asked_by']} - الحالة: {q['status']}")
-            answers = json.loads(q.get('answers', '[]'))
-            if answers:
-                for a in answers:
-                    st.write(f"**{a['author']}**: {a['text']}")
-            # نموذج رد
-            with st.form(key=f"reply_{q['id']}"):
-                reply = st.text_input("ردك")
-                if st.form_submit_button("رد"):
-                    if reply:
-                        user = st.session_state.user
-                        is_specialist = user['role'] == 'specialist' or user['role'] == 'owner'
-                        add_forum_answer(q['id'], reply, user['name'], user['uid'], is_specialist)
-                        st.session_state.forum_questions = get_forum_questions()
-                        st.rerun()
-            if st.session_state.user['role'] in ['specialist', 'owner']:
-                if st.button(f"غلق السؤال", key=f"close_{q['id']}"):
-                    update_forum_status(q['id'], 'closed')
-                    st.session_state.forum_questions = get_forum_questions()
-                    st.rerun()
-    # سؤال جديد
-    with st.form("new_question"):
-        title = st.text_input("عنوان السؤال")
-        body = st.text_area("التفاصيل")
-        target = st.selectbox("توجيه إلى", ["جميع الأخصائيين"] + [d['name'] for d in st.session_state.get('specialists', [])])
-        if st.form_submit_button("نشر السؤال"):
-            if title and body:
-                user = st.session_state.user
-                add_forum_question(title, body, user['name'], user['uid'], target)
-                st.session_state.forum_questions = get_forum_questions()
-                st.success("✅ تم نشر السؤال")
-                st.rerun()
-
-# =============================================================
 # تشغيل التطبيق
 # =============================================================
 if __name__ == "__main__":
     main()
-```
