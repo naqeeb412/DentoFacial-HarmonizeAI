@@ -11,7 +11,7 @@ st.set_page_config(**PAGE_CONFIG)
 st.title("🦷 DentoFacial-HarmonizeAI™")
 st.markdown("##### المنصة الذكية لتحليل الوجه وتناسق الابتسامة (478 Landmark Detection)")
 
-@st.cache_resource
+# @st.cache_resource
 def load_analyzer():
     return HarmonizeAnalyzer()
 
