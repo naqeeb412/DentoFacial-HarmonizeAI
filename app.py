@@ -11,7 +11,6 @@ from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
-import re
 from pathlib import Path
 
 # إعدادات الصفحة (يجب أن تكون في الأعلى)
