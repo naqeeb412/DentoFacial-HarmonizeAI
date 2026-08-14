@@ -13,7 +13,12 @@ import plotly.graph_objects as go
 import plotly.express as px
 import re
 from pathlib import Path
-
+streamlit
+pandas
+numpy
+pillow
+plotly
+matplotlib
 # إعدادات الصفحة (يجب أن تكون في الأعلى)
 st.set_page_config(
     page_title="Dentofacial HarmonizeAI™",
