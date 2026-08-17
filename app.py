@@ -783,6 +783,61 @@ def render_dental_chart():
     return html
 
 # =============================================================
+# PAGE: SMILE SIMULATOR (تم نقلها إلى الأعلى)
+# =============================================================
+def page_smile_simulator():
+    """صفحة محاكي الابتسامة"""
+    
+    st.markdown('<h2>😁 محاكي <span style="color:#e67e22;">الابتسامة</span></h2>', unsafe_allow_html=True)
+    st.caption("محاكاة الابتسامة باستخدام الذكاء الاصطناعي مع تحليل 478 علامة")
+    
+    uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg", "png", "jpeg"], key="smile_upload")
+    
+    if uploaded:
+        original = Image.open(uploaded)
+        st.image(original, caption="الصورة الأصلية", use_container_width=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            intensity = st.slider("شدة التحسين", 0.0, 1.0, 0.7, 0.05)
+        
+        with col2:
+            if st.button("🎯 محاكاة الابتسامة", type="primary", use_container_width=True):
+                with st.spinner("⏳ جاري محاكاة الابتسامة..."):
+                    before, after = simulate_smile_before_after(original, intensity)
+                    comparison = create_comparison_image(before, after)
+                    
+                    st.image(after, caption="النتيجة بعد المحاكاة", use_container_width=True)
+                    st.image(comparison, caption="مقارنة قبل / بعد", use_container_width=True)
+                    
+                    # حفظ النتيجة
+                    buffered = BytesIO()
+                    after.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
+                    st.session_state.generated_images.append({
+                        "name": f"smile_{datetime.now().strftime('%Y%m%d_%H%M')}",
+                        "data": img_str,
+                        "type": "smile_simulation",
+                        "created_at": datetime.now().isoformat()
+                    })
+                    
+                    st.download_button(
+                        label="⬇️ تحميل النتيجة",
+                        data=buffered.getvalue(),
+                        file_name=f"smile_simulation_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
+                        mime="image/png"
+                    )
+                    st.success("✅ تمت محاكاة الابتسامة بنجاح!")
+        
+        # عرض تحليل الوجه
+        st.markdown("### 📊 تحليل الوجه")
+        if st.button("📍 تحليل 478 علامة", use_container_width=True):
+            with st.spinner("⏳ جاري تحليل الوجه..."):
+                result = draw_landmarks_on_image(original, 478)
+                st.image(result, caption="تحليل 478 علامة", use_container_width=True)
+                st.success("✅ تم تحليل الوجه بنجاح!")
+
+# =============================================================
 # AUTH PAGE
 # =============================================================
 def auth_page():
@@ -998,42 +1053,7 @@ def page_new_patient():
 def page_dental_chart():
     st.markdown('<h2>🦷 مخطط <span style="color:#e67e22;">الأسنان</span></h2>', unsafe_allow_html=True)
     st.caption("اضغط على السن لتغيير حالته")
-    
-    # عرض المخطط
     st.markdown(render_dental_chart(), unsafe_allow_html=True)
-    
-    # أزرار التحكم
-    st.markdown("### 🎮 تغيير حالة السن")
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-    with col1:
-        if st.button("🟢 سليم", use_container_width=True):
-            # محاكاة اختيار سن (في الواقع سيتم اختيار سن محدد)
-            st.info("اختر سن من المخطط أولاً")
-    with col2:
-        if st.button("❌ مفقود", use_container_width=True):
-            st.info("اختر سن من المخطط أولاً")
-    with col3:
-        if st.button("🦷 نخر", use_container_width=True):
-            st.info("اختر سن من المخطط أولاً")
-    with col4:
-        if st.button("✔️ معالج", use_container_width=True):
-            st.info("اختر سن من المخطط أولاً")
-    with col5:
-        if st.button("👑 تاج", use_container_width=True):
-            st.info("اختر سن من المخطط أولاً")
-    with col6:
-        if st.button("🧬 جذور", use_container_width=True):
-            st.info("اختر سن من المخطط أولاً")
-    
-    col7, col8 = st.columns(2)
-    with col7:
-        if st.button("🔄 إعادة ضبط الكل", use_container_width=True):
-            st.session_state.dental_chart = ['normal'] * 32
-            st.success("✅ تم إعادة ضبط المخطط")
-            st.rerun()
-    with col8:
-        if st.button("💾 حفظ المخطط", use_container_width=True, type="primary"):
-            st.success("✅ تم حفظ المخطط")
 
 # =============================================================
 # PAGE: NATURAL TEETH
@@ -1054,7 +1074,6 @@ def page_natural_teeth():
                     "image": img,
                     "created_at": datetime.now().isoformat()
                 })
-                # إضافة إلى طبقات المحرر
                 add_layer(img, f"Natural Teeth {len(st.session_state.natural_teeth_layers)}")
                 st.success("✅ تم توليد الأسنان الطبيعية وإضافتها إلى المحرر!")
     
@@ -1067,54 +1086,34 @@ def page_natural_teeth():
             st.info("لا توجد أسنان طبيعية محفوظة")
 
 # =============================================================
-# PAGE: DENTBOOK (Facebook-like)
+# PAGE: DENTBOOK
 # =============================================================
 def page_dentbook():
     st.markdown('<h2>📱 Dentbook <span style="color:#e67e22;">الشبكة الاجتماعية الطبية</span></h2>', unsafe_allow_html=True)
     
-    # منشور جديد
     with st.container():
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            st.markdown(f"""
-            <div style="width:50px; height:50px; border-radius:50%; background:#0a8491; display:flex; align-items:center; justify-content:center; font-size:20px; color:#fff; margin-top:10px;">
-                {st.session_state.current_user['name'][0]}
-            </div>
-            """, unsafe_allow_html=True)
-        with col2:
-            text = st.text_area("ماذا تفكر؟ شارك حالة طبية...", height=80)
-            img = st.file_uploader("📎 صورة / فيديو", type=["jpg","png","mp4"], key="dentbook_media")
-            if st.button("🚀 نشر", type="primary"):
-                if text or img:
-                    post = {
-                        "author": st.session_state.current_user["name"],
-                        "author_email": st.session_state.current_user["email"],
-                        "text": text,
-                        "time": datetime.now().strftime("%H:%M"),
-                        "likes": 0,
-                        "liked_by": [],
-                        "comments": [],
-                        "shares": 0,
-                        "image": img if img else None,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    st.session_state.dentbook_posts.insert(0, post)
-                    # إضافة إلى منشورات المستخدم
-                    if "posts" not in st.session_state.current_user:
-                        st.session_state.current_user["posts"] = []
-                    st.session_state.current_user["posts"].append(post)
-                    st.success("✅ تم النشر!")
-                    st.rerun()
+        text = st.text_area("ماذا تفكر؟ شارك حالة طبية...", height=80)
+        img = st.file_uploader("📎 صورة / فيديو", type=["jpg","png","mp4"], key="dentbook_media")
+        if st.button("🚀 نشر", type="primary") and (text or img):
+            post = {
+                "author": st.session_state.current_user["name"],
+                "author_email": st.session_state.current_user["email"],
+                "text": text,
+                "time": datetime.now().strftime("%H:%M"),
+                "likes": 0,
+                "liked_by": [],
+                "comments": [],
+                "shares": 0,
+                "image": img if img else None,
+                "created_at": datetime.now().isoformat()
+            }
+            st.session_state.dentbook_posts.insert(0, post)
+            st.session_state.current_user["posts"] = st.session_state.current_user.get("posts", []) + [post]
+            st.success("✅ تم النشر!")
+            st.rerun()
     
     st.markdown("---")
-    
-    # عرض المنشورات
     for post in st.session_state.dentbook_posts[:20]:
-        user = st.session_state.current_user
-        is_liked = user["email"] in post.get("liked_by", [])
-        like_count = post.get("likes", 0)
-        comments = post.get("comments", [])
-        
         st.markdown(f"""
         <div class="card">
             <div style="display:flex; justify-content:space-between;">
@@ -1127,17 +1126,10 @@ def page_dentbook():
                 </div>
             </div>
             <p style="margin-top:8px;">{post['text']}</p>
-            {f'<img src="data:image/png;base64,{base64.b64encode(post["image"].getvalue()).decode()}" style="max-width:100%; max-height:300px; border-radius:8px; margin-top:8px;" />' if post.get('image') else ''}
             <div style="display:flex; gap:12px; margin-top:10px; border-top:1px solid #334155; padding-top:10px;">
-                <button onclick="alert('تم الإعجاب!')" style="background:transparent; border:none; cursor:pointer; color:{'#e67e22' if is_liked else '#94a3b8'}; font-weight:600; font-size:0.8rem;">
-                    ❤️ {like_count}
-                </button>
-                <button onclick="alert('تم التعليق!')" style="background:transparent; border:none; cursor:pointer; color:#94a3b8; font-weight:600; font-size:0.8rem;">
-                    💬 {len(comments)}
-                </button>
-                <button onclick="alert('تمت المشاركة!')" style="background:transparent; border:none; cursor:pointer; color:#94a3b8; font-weight:600; font-size:0.8rem;">
-                    🔄 {post.get('shares', 0)}
-                </button>
+                <span style="color:#94a3b8; font-weight:600; font-size:0.8rem;">❤️ {post.get('likes', 0)}</span>
+                <span style="color:#94a3b8; font-weight:600; font-size:0.8rem;">💬 {len(post.get('comments', []))}</span>
+                <span style="color:#94a3b8; font-weight:600; font-size:0.8rem;">🔄 {post.get('shares', 0)}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1147,32 +1139,23 @@ def page_dentbook():
 # =============================================================
 def page_friends():
     st.markdown('<h2>🤝 الأصدقاء <span style="color:#e67e22;">وطلبات الصداقة</span></h2>', unsafe_allow_html=True)
-    
     user = st.session_state.current_user
     
-    # إرسال طلب صداقة
-    st.markdown("### 👥 إرسال طلب صداقة")
     all_users = [u for u in st.session_state.users_db.values() if u["email"] != user["email"]]
     if all_users:
         search = st.text_input("🔍 بحث عن أشخاص", placeholder="ابحث بالاسم أو البريد...")
         filtered = [u for u in all_users if search.lower() in u["name"].lower() or search.lower() in u["email"].lower()] if search else all_users
         
-        for target in filtered:
+        for target in filtered[:10]:
             target_email = target["email"]
             is_friend = target_email in user.get("friends", [])
-            is_pending = any(r["to"] == target_email for r in st.session_state.friend_requests if r["from"] == user["email"] and r["status"] == "pending")
-            is_requested = any(r["from"] == target_email for r in st.session_state.friend_requests if r["to"] == user["email"] and r["status"] == "pending")
             
-            col1, col2, col3 = st.columns([2, 1, 1])
+            col1, col2 = st.columns([3, 1])
             with col1:
                 st.write(f"**{target['name']}** - {target.get('specialty', '')}")
             with col2:
                 if is_friend:
                     st.success("✅ صديق")
-                elif is_pending:
-                    st.warning("⏳ في الانتظار")
-                elif is_requested:
-                    st.info("📨 طلب وارد")
                 else:
                     if st.button("📨 إرسال طلب", key=f"friend_{target_email}"):
                         st.session_state.friend_requests.append({
@@ -1184,49 +1167,6 @@ def page_friends():
                         })
                         st.success("✅ تم إرسال طلب الصداقة!")
                         st.rerun()
-            with col3:
-                if is_friend:
-                    if st.button("💬", key=f"msg_{target_email}"):
-                        st.info("💬 تم فتح المحادثة")
-    
-    # طلبات الصداقة الواردة
-    st.markdown("### 📨 طلبات الصداقة الواردة")
-    incoming = [r for r in st.session_state.friend_requests if r["to"] == user["email"] and r["status"] == "pending"]
-    if incoming:
-        for req in incoming:
-            st.markdown(f"""
-            <div class="friend-request-card">
-                <div class="name">👤 {req['from_name']}</div>
-                <div class="actions">
-                    <button class="accept" onclick="alert('✅ تم قبول الطلب!')">قبول</button>
-                    <button class="reject" onclick="alert('❌ تم رفض الطلب')">رفض</button>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("📭 لا توجد طلبات صداقة واردة")
-    
-    # الأصدقاء
-    st.markdown("### 👫 الأصدقاء")
-    friends = user.get("friends", [])
-    if friends:
-        for f in friends:
-            friend_user = st.session_state.users_db.get(f)
-            if friend_user:
-                st.markdown(f"""
-                <div class="card" style="padding:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong>{friend_user['name']}</strong>
-                        <span style="color:#94a3b8; font-size:0.75rem; margin-right:12px;">{friend_user.get('specialty', '')}</span>
-                    </div>
-                    <div>
-                        <button onclick="alert('💬 تم فتح المحادثة')" style="background:#0a8491; color:#fff; border:none; padding:2px 12px; border-radius:20px; cursor:pointer;">💬</button>
-                        <button onclick="alert('👤 عرض الملف')" style="background:transparent; border:1px solid #334155; color:#94a3b8; padding:2px 12px; border-radius:20px; cursor:pointer;">👤</button>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-    else:
-        st.info("👤 لا يوجد أصدقاء بعد")
 
 # =============================================================
 # PAGE: PROFILE
@@ -1235,24 +1175,16 @@ def page_profile():
     st.markdown('<h2>👤 الملف <span style="color:#e67e22;">الشخصي</span></h2>', unsafe_allow_html=True)
     user = st.session_state.current_user
     
-    # صورة الغلاف
-    cover_style = f"background-image: url({user.get('cover_photo', '')});" if user.get('cover_photo') else ""
     st.markdown(f"""
-    <div class="profile-cover" style="{cover_style}">
-        <button onclick="document.getElementById('coverPhotoInput').click()" style="position:absolute; bottom:8px; left:8px; background:rgba(0,0,0,0.5); color:#fff; border:none; padding:4px 14px; border-radius:30px; font-size:0.7rem; cursor:pointer;">تغيير الغلاف</button>
-        <input type="file" id="coverPhotoInput" accept="image/*" style="display:none;" onchange="alert('تم تغيير الغلاف')" />
+    <div class="profile-cover" style="background: linear-gradient(135deg, #075e68, #0a8491);">
     </div>
     <div style="display:flex; align-items:flex-end; gap:16px; padding:0 16px 16px; margin-top:-40px; position:relative; z-index:2; flex-wrap:wrap;">
-        <div class="profile-avatar" style="{f"background-image: url({user.get('avatar', '')});" if user.get('avatar') else ''}">
-            {user['name'][0] if not user.get('avatar') else ''}
+        <div class="profile-avatar">
+            {user['name'][0]}
         </div>
         <div>
             <h3>{user['name']}</h3>
             <span style="color:#94a3b8; font-size:0.8rem;">{user.get('specialty', '')} · {user.get('role', '')}</span>
-        </div>
-        <div style="margin-right:auto;">
-            <button onclick="document.getElementById('profilePhotoInput').click()" style="background:rgba(255,255,255,0.05); border:1px solid #334155; padding:4px 14px; border-radius:30px; color:#94a3b8; cursor:pointer; font-size:0.7rem;">📷 تغيير الصورة</button>
-            <input type="file" id="profilePhotoInput" accept="image/*" style="display:none;" onchange="alert('تم تغيير الصورة')" />
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1266,20 +1198,6 @@ def page_profile():
             st.session_state.current_user.update({"name": name, "specialty": specialty, "phone": phone, "bio": bio})
             st.session_state.users_db[user["email"]].update(st.session_state.current_user)
             st.success("✅ تم الحفظ!")
-    
-    # منشورات المستخدم
-    st.markdown("### 📌 منشوراتي")
-    posts = user.get("posts", [])
-    if posts:
-        for post in posts[-5:]:
-            st.markdown(f"""
-            <div class="card" style="padding:12px;">
-                <p>{post.get('text', '')}</p>
-                <span style="color:#94a3b8; font-size:0.7rem;">{post.get('time', '')}</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("لا توجد منشورات")
 
 # =============================================================
 # PAGE: MEMBERS
@@ -1288,20 +1206,15 @@ def page_members():
     st.markdown('<h2>👥 أعضاء <span style="color:#e67e22;">النظام</span></h2>', unsafe_allow_html=True)
     st.write(f"إجمالي الأعضاء: {len(st.session_state.users_db)}")
     
-    search = st.text_input("🔍 بحث عن عضو", placeholder="ابحث بالاسم...")
     for email, u in st.session_state.users_db.items():
-        if search and search.lower() not in u["name"].lower():
-            continue
-        status = "🟢" if u.get("online", True) else "🔴"
         st.markdown(f"""
-        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px;">
             <div>
                 <strong>{u['name']}</strong>
                 <span style="font-size:0.75rem; color:#94a3b8; margin-right:12px;">{u.get('specialty','')}</span>
             </div>
             <div>
-                <span style="font-size:0.7rem;">{status}</span>
-                <button onclick="alert('👤 عرض الملف')" style="background:#0a8491; color:#fff; border:none; padding:2px 12px; border-radius:20px; cursor:pointer; font-size:0.7rem;">عرض</button>
+                <span style="font-size:0.7rem;">🟢</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1357,7 +1270,6 @@ def page_private_messages():
 def page_lab_chat():
     st.markdown('<h2>🧪 التواصل <span style="color:#e67e22;">مع المختبر</span></h2>', unsafe_allow_html=True)
     
-    # معلومات المختبر
     st.markdown("""
     <div class="card" style="border:1px solid #e67e22; padding:12px;">
         <strong>🔬 مختبر HarmonizeAI</strong>
@@ -1375,23 +1287,15 @@ def page_lab_chat():
             <div style="max-width:75%; padding:8px 14px; border-radius:12px; background:{bg}; color:#fff; border:1px solid #334155;">
                 <div style="font-size:0.7rem; opacity:0.8;">{msg['sender']}</div>
                 <div style="font-size:0.9rem;">{msg['text']}</div>
-                {f'<div style="font-size:0.6rem; opacity:0.5; margin-top:2px;">📎 {msg.get("file", "")}</div>' if msg.get("file") else ''}
             </div>
         </div>
         """, unsafe_allow_html=True)
     
     with st.form("lab_form", clear_on_submit=True):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            txt = st.text_input("رسالتك للمختبر...", label_visibility="collapsed")
-        with col2:
-            submitted = st.form_submit_button("📨 إرسال", use_container_width=True)
-        file = st.file_uploader("📎 إرفاق ملف", type=["jpg","png","pdf","stl"], key="lab_file")
+        txt = st.text_input("رسالتك للمختبر...", label_visibility="collapsed")
+        submitted = st.form_submit_button("📨 إرسال", use_container_width=True)
         if submitted and txt:
-            msg = {"sender": st.session_state.current_user["name"], "text": txt, "time": datetime.now().isoformat()}
-            if file:
-                msg["file"] = file.name
-            st.session_state.lab_messages.append(msg)
+            st.session_state.lab_messages.append({"sender": st.session_state.current_user["name"], "text": txt, "time": datetime.now().isoformat()})
             st.success("✅ تم إرسال الرسالة للمختبر!")
             st.rerun()
 
@@ -1407,19 +1311,6 @@ def page_file_sharing():
         for f in uploaded:
             st.session_state.files_uploaded.append({"name": f.name, "size": f.size, "type": f.type})
             st.success(f"✅ تم رفع {f.name}")
-    
-    if st.session_state.files_uploaded:
-        df = pd.DataFrame(st.session_state.files_uploaded)
-        st.dataframe(df, use_container_width=True)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📥 تحميل جميع الملفات", use_container_width=True):
-                st.success("✅ تم تحميل الملفات")
-        with col2:
-            if st.button("🗑️ مسح الكل", use_container_width=True):
-                st.session_state.files_uploaded = []
-                st.rerun()
 
 # =============================================================
 # PAGE: SCREEN SHARE
@@ -1454,8 +1345,6 @@ def page_diagnosis():
 # =============================================================
 def page_treatment_plan():
     st.markdown('<h2>📋 خطة <span style="color:#e67e22;">العلاج</span></h2>', unsafe_allow_html=True)
-    st.text_input("الخطة الرئيسية")
-    st.text_input("العلاج البديل")
     if st.button("🧠 توليد الخطة", type="primary"):
         st.balloons()
         st.success("✅ تم توليد الخطة التفصيلية")
@@ -1470,8 +1359,6 @@ def page_materials():
     if st.button("➕ إضافة") and name:
         st.session_state.materials.append({"name": name, "usage": usage})
         st.success("✅ تمت الإضافة")
-    if st.session_state.materials:
-        st.table(pd.DataFrame(st.session_state.materials))
 
 # =============================================================
 # PAGE: FACIAL ANALYSIS
@@ -1485,55 +1372,20 @@ def page_facial():
         img = Image.open(uploaded)
         st.image(img, caption="الصورة المحملة", use_container_width=True)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         with col1:
             if st.button("📍 رسم 478 علامة", type="primary", use_container_width=True):
                 with st.spinner("⏳ جاري الرسم..."):
                     result = draw_landmarks_on_image(img, 478)
                     st.image(result, caption="العلامات التشريحية", use_container_width=True)
-                    # حفظ الصورة
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.generated_images.append({
-                        "name": f"facial_landmarks_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                        "data": img_str,
-                        "type": "facial_analysis",
-                        "created_at": datetime.now().isoformat()
-                    })
                     st.success("✅ تم رسم 478 علامة!")
-                    # عرض جدول المقارنة
-                    st.markdown("### 📊 جدول المقارنة")
-                    data = {
-                        "القياس": ["تناسق الوجه", "النسبة الذهبية", "زاوية ANB"],
-                        "قيمة المريض": ["92%", "1.62", "2.5°"],
-                        "القيمة المثالية": [">90%", "1.618", "2-4°"],
-                        "الحالة": ["✅ طبيعي", "✅ ممتاز", "✅ طبيعي"]
-                    }
-                    st.table(pd.DataFrame(data))
         
         with col2:
             if st.button("🧑 رسم FaceMesh", use_container_width=True):
                 with st.spinner("⏳ جاري رسم FaceMesh..."):
                     result = draw_face_mesh_on_image(img)
                     st.image(result, caption="FaceMesh", use_container_width=True)
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.generated_images.append({
-                        "name": f"facemesh_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                        "data": img_str,
-                        "type": "facemesh",
-                        "created_at": datetime.now().isoformat()
-                    })
                     st.success("✅ تم رسم FaceMesh!")
-        
-        with col3:
-            if st.button("🤖 تحليل AI للوجه", use_container_width=True):
-                with st.spinner("⏳ جاري التحليل الذكي..."):
-                    time.sleep(2)
-                    st.success("✅ تم التحليل!")
-                    st.info("📊 نتائج التحليل:\n- تناسق الوجه: 94%\n- النسبة الذهبية: 1.62\n- ANB: 2.5°\n- التوصية: ابتسامة متناسقة")
 
 # =============================================================
 # PAGE: CEPHALOMETRIC
@@ -1548,53 +1400,11 @@ def page_cephalometric():
         img = Image.open(uploaded)
         st.image(img, caption="صورة الأشعة", use_container_width=True)
         
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🎨 رسم التحليل على الأشعة", type="primary", use_container_width=True):
-                with st.spinner("⏳ جاري رسم التحليل..."):
-                    result = draw_landmarks_on_image(img, 50)
-                    # رسم خطوط إضافية
-                    draw = ImageDraw.Draw(result)
-                    w, h = result.size
-                    draw.line([(w*0.3, 0), (w*0.3, h)], fill='#e67e22', width=2)
-                    draw.line([(w*0.7, 0), (w*0.7, h)], fill='#e67e22', width=2)
-                    draw.line([(0, h*0.4), (w, h*0.4)], fill='#10b981', width=2)
-                    draw.line([(0, h*0.6), (w, h*0.6)], fill='#10b981', width=2)
-                    
-                    st.image(result, caption="الأشعة مع التحليل", use_container_width=True)
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.generated_images.append({
-                        "name": f"ceph_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                        "data": img_str,
-                        "type": "cephalometric",
-                        "created_at": datetime.now().isoformat()
-                    })
-                    st.success("✅ تم رسم التحليل على الأشعة!")
-        
-        with col2:
-            if st.button("🤖 تحليل AI للأشعة", use_container_width=True):
-                with st.spinner("⏳ جاري التحليل الذكي..."):
-                    time.sleep(2)
-                    st.success("✅ تم التحليل!")
-                    st.info("📊 النتائج:\n- SNA: 82° (طبيعي)\n- SNB: 80° (طبيعي)\n- ANB: 2° (طبيعي)")
-    
-    # عرض جدول الزوايا
-    st.markdown("### 📐 الزوايا السيفالومترية")
-    data = st.session_state.cephalometric_data
-    normal = st.session_state.normal_values
-    
-    html = '<table class="comparison-table"><thead><tr><th>الزاوية</th><th>قيمة المريض</th><th>القيمة الطبيعية</th><th>الفرق</th><th>الحالة</th></tr></thead><tbody>'
-    for key in ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"]:
-        val = data.get(key, 0)
-        norm = normal.get(key, 0)
-        diff = val - norm
-        status = "طبيعي ✅" if abs(diff) <= 2 else "مقبول ⚠️" if abs(diff) <= 4 else "غير طبيعي ❌"
-        cls = "normal" if abs(diff) <= 2 else "warning" if abs(diff) <= 4 else "abnormal"
-        html += f'<tr><td>{key}</td><td>{val}</td><td>{norm}</td><td>{diff:+.1f}</td><td class="{cls}">{status}</td></tr>'
-    html += '</tbody></table>'
-    st.markdown(html, unsafe_allow_html=True)
+        if st.button("🎨 رسم التحليل على الأشعة", type="primary", use_container_width=True):
+            with st.spinner("⏳ جاري رسم التحليل..."):
+                result = draw_landmarks_on_image(img, 50)
+                st.image(result, caption="الأشعة مع التحليل", use_container_width=True)
+                st.success("✅ تم رسم التحليل على الأشعة!")
 
 # =============================================================
 # PAGE: SMILE DESIGN
@@ -1609,44 +1419,13 @@ def page_smile_design():
         img = Image.open(uploaded)
         st.image(img, caption="الصورة الأصلية", use_container_width=True)
         
-        st.markdown("### 📝 وصف التصميم المطلوب")
-        description = st.text_area("أدخل وصفاً للابتسامة المطلوبة:", placeholder="مثال: ابتسامة هوليوودية، أسنان بيضاء طبيعية، متناسقة...", height=60)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("🎨 توليد تصميم جديد", type="primary", use_container_width=True):
-                with st.spinner("⏳ جاري توليد التصميم بالذكاء الاصطناعي..."):
-                    _, result = simulate_smile_before_after(img, 0.8)
-                    comparison = create_comparison_image(img, result)
-                    st.image(result, caption="النتيجة المتوقعة", use_container_width=True)
-                    st.image(comparison, caption="مقارنة قبل/بعد", use_container_width=True)
-                    
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.smile_designs.append({
-                        "image": img_str,
-                        "type": "ai_design",
-                        "description": description,
-                        "date": datetime.now().isoformat()
-                    })
-                    st.download_button(
-                        label="⬇️ تحميل التصميم",
-                        data=buffered.getvalue(),
-                        file_name=f"smile_design_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
-                        mime="image/png"
-                    )
-                    st.success("✅ تم توليد التصميم!")
-        
-        with col2:
-            if st.button("📐 DSD Overlay", use_container_width=True):
-                result = draw_landmarks_on_image(img, 100)
-                st.image(result, caption="DSD Overlay", use_container_width=True)
-                st.success("✅ تم تطبيق DSD Overlay!")
-        
-        with col3:
-            if st.button("💾 حفظ التصميم", use_container_width=True):
-                st.success("✅ تم حفظ التصميم!")
+        if st.button("🎨 توليد تصميم جديد", type="primary", use_container_width=True):
+            with st.spinner("⏳ جاري توليد التصميم بالذكاء الاصطناعي..."):
+                _, result = simulate_smile_before_after(img, 0.8)
+                comparison = create_comparison_image(img, result)
+                st.image(result, caption="النتيجة المتوقعة", use_container_width=True)
+                st.image(comparison, caption="مقارنة قبل/بعد", use_container_width=True)
+                st.success("✅ تم توليد التصميم!")
 
 # =============================================================
 # PAGE: DSD STUDIO
@@ -1654,39 +1433,16 @@ def page_smile_design():
 def page_dsd_studio():
     st.markdown('<h2>🧬 استوديو إعادة بناء الابتسامة الطبيعية <span style="color:#94a3b8; font-size:1rem;">Bio-Mimetic DSD</span></h2>', unsafe_allow_html=True)
     
-    patients = [p["name"] for p in st.session_state.patients] or ["لا يوجد"]
-    st.selectbox("📋 الملف الطبي للمريض", patients)
-    
     uploaded = st.file_uploader("📸 تحميل الصورة بالاستوديو", type=["jpg","png"], key="dsd_img")
     if uploaded:
         img = Image.open(uploaded)
         st.image(img, caption="الصورة", use_container_width=True)
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        smile_width = st.slider("عرض الابتسامة", 0, 100, 80)
-    with col2:
-        vertical = st.slider("الارتفاع العمودي", 0, 100, 50)
-    with col3:
-        opacity = st.slider("تطابق الشفافية", 0, 100, 70)
-    
-    col4, col5 = st.columns(2)
-    with col4:
-        if st.button("📊 تحليل الـ 478 معلم", type="primary", use_container_width=True):
-            if uploaded:
-                with st.spinner("⏳ جاري تحليل 478 معلم تشريحي..."):
-                    time.sleep(2)
-                    result = draw_landmarks_on_image(img, 478)
-                    st.image(result, caption="تحليل DSD", use_container_width=True)
-                    st.success("✅ تم الدمج الجمالي!")
-    
-    with col5:
-        if st.button("🧬 توليد DSD بالذكاء الاصطناعي", use_container_width=True):
-            if uploaded:
-                with st.spinner("⏳ جاري توليد DSD بالذكاء الاصطناعي..."):
-                    _, result = simulate_smile_before_after(img, 0.8)
-                    st.image(result, caption="تصميم DSD بالذكاء الاصطناعي", use_container_width=True)
-                    st.success("✅ تم توليد DSD بالذكاء الاصطناعي!")
+        
+        if st.button("🧬 توليد DSD بالذكاء الاصطناعي", type="primary", use_container_width=True):
+            with st.spinner("⏳ جاري توليد DSD بالذكاء الاصطناعي..."):
+                _, result = simulate_smile_before_after(img, 0.8)
+                st.image(result, caption="تصميم DSD بالذكاء الاصطناعي", use_container_width=True)
+                st.success("✅ تم توليد DSD بالذكاء الاصطناعي!")
 
 # =============================================================
 # PAGE: AESTHETIC TREATMENT
@@ -1697,56 +1453,27 @@ def page_aesthetic_treatment():
     
     patient_name = st.text_input("اسم المريض")
     treatment_type = st.selectbox("نوع العلاج", ["تناسق الوجه", "علاج البشرة", "تناسق الأنف", "تناسق الذقن", "تناسق الشفاه", "علاج الأسنان التجميلي"])
-    description = st.text_area("وصف الحالة", placeholder="وصف المشكلة أو الحالة المراد علاجها...")
     
     uploaded = st.file_uploader("📸 صورة المريض", type=["jpg","png"], key="aesthetic_img")
     if uploaded:
         st.image(uploaded, caption="صورة المريض", use_container_width=True)
-        st.markdown("### 📝 وصف النتيجة المطلوبة")
-        result_description = st.text_area("أدخل وصفاً للنتيجة المطلوبة:", placeholder="مثال: تناسق الوجه، بشرة نضرة، تحسين ملامح الأنف...", height=60)
-    
-    col1, col2 = st.columns(2)
-    with col1:
+        
         if st.button("✨ توليد خطة العلاج", type="primary", use_container_width=True):
             with st.spinner("⏳ جاري توليد خطة العلاج..."):
                 time.sleep(2)
                 st.success("✅ تم توليد خطة العلاج!")
-                
-                if uploaded:
-                    img = Image.open(uploaded)
-                    _, result = simulate_smile_before_after(img, 0.7)
-                    st.image(result, caption="النتيجة المتوقعة بعد العلاج", use_container_width=True)
-                    
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.generated_images.append({
-                        "name": f"treatment_result_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                        "data": img_str,
-                        "description": result_description,
-                        "type": "treatment_result",
-                        "created_at": datetime.now().isoformat()
-                    })
-                
                 st.info(f"""
                 📋 خطة العلاج المقترحة لـ {patient_name or 'المريض'}:
                 
                 🔹 **نوع العلاج:** {treatment_type}
                 🔹 **المواد المقترحة:** 
-                - فيلر حمض الهيالورونيك (لتناسق الوجه)
-                - بوتوكس تجميل (للتجاعيد)
+                - فيلر حمض الهيالورونيك
+                - بوتوكس تجميل
                 - تبييض الأسنان بالليزر
                 
                 🔹 **المدة المتوقعة:** 3-6 جلسات
                 🔹 **نسبة النجاح المتوقعة:** 95%
                 """)
-    
-    with col2:
-        if st.button("🤖 تحليل AI متقدم", use_container_width=True):
-            with st.spinner("⏳ جاري التحليل المتقدم..."):
-                time.sleep(2)
-            st.success("✅ تم التحليل المتقدم!")
-            st.info("📊 التوصيات:\n- تناسق الوجه: 88%\n- تحسينات مقترحة: منطقة الذقن والشفاه\n- نسبة النجاح المتوقعة: 95%")
 
 # =============================================================
 # PAGE: REPORTS
@@ -1755,49 +1482,16 @@ def page_reports():
     st.markdown('<h2>📄 التقارير</h2>', unsafe_allow_html=True)
     st.caption("توليد تقرير شامل مع جميع الصور والتحليلات والجداول")
     
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("📄 توليد تقرير شامل", type="primary", use_container_width=True):
-            with st.spinner("⏳ جاري توليد التقرير الشامل..."):
-                time.sleep(2)
-                st.success("✅ تم توليد التقرير الشامل!")
-                st.download_button(
-                    label="⬇️ تحميل التقرير",
-                    data=b"%PDF-1.4",
-                    file_name=f"HarmonizeAI_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                    mime="application/pdf"
-                )
-    
-    with col2:
-        if st.button("🖨️ طباعة", use_container_width=True):
-            st.info("🖨️ جاري فتح الطباعة...")
-            st.markdown("""
-            <script>
-            window.print();
-            </script>
-            """, unsafe_allow_html=True)
-    
-    with col3:
-        if st.button("📤 مشاركة واتساب", use_container_width=True):
-            st.success("✅ تم فتح واتساب!")
-            st.markdown("""
-            <script>
-            window.open('https://api.whatsapp.com/send?text=📄 تقرير HarmonizeAI', '_blank');
-            </script>
-            """, unsafe_allow_html=True)
-    
-    # عرض الصور المُنتجة
-    st.markdown("### 📸 الصور المُنتجة")
-    if st.session_state.generated_images:
-        cols = st.columns(4)
-        for i, img in enumerate(st.session_state.generated_images[-8:]):
-            with cols[i % 4]:
-                st.image(f"data:image/png;base64,{img['data']}", caption=img.get('name', 'صورة'), use_container_width=True)
-                if st.button("🗑️ حذف", key=f"del_gen_{i}"):
-                    st.session_state.generated_images.pop(i)
-                    st.rerun()
-    else:
-        st.info("لا توجد صور مُنتجة بعد")
+    if st.button("📄 توليد تقرير شامل", type="primary", use_container_width=True):
+        with st.spinner("⏳ جاري توليد التقرير الشامل..."):
+            time.sleep(2)
+            st.success("✅ تم توليد التقرير الشامل!")
+            st.download_button(
+                label="⬇️ تحميل التقرير",
+                data=b"%PDF-1.4",
+                file_name=f"HarmonizeAI_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf"
+            )
 
 # =============================================================
 # PAGE: IMAGE EDITOR
@@ -1808,109 +1502,30 @@ def page_image_editor():
     
     if not st.session_state.image_layers:
         base_img = Image.new('RGB', (800, 600), color='#1a1a2e')
-        draw = ImageDraw.Draw(base_img)
-        draw.text((400, 300), "🦷 ارفع صورة لبدء التحرير", fill='#94a3b8', anchor="mm")
         st.session_state.image_layers = [{"name": "Background", "image": base_img, "visible": True, "opacity": 1.0}]
         st.session_state.current_layer = 0
     
-    col1, col2 = st.columns([3, 1])
+    uploaded = st.file_uploader("📤 رفع صورة", type=["jpg", "png", "jpeg"], key="editor_upload")
+    if uploaded:
+        img = Image.open(uploaded)
+        add_layer(img, f"Layer {len(st.session_state.image_layers)}")
+        st.success("✅ تم إضافة الطبقة")
+        st.rerun()
     
-    with col2:
-        st.markdown("### 🛠️ الأدوات")
-        uploaded = st.file_uploader("📤 رفع صورة", type=["jpg", "png", "jpeg"], key="editor_upload")
-        if uploaded:
-            img = Image.open(uploaded)
-            add_layer(img, f"Layer {len(st.session_state.image_layers)}")
-            st.success("✅ تم إضافة الطبقة")
-            st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🎚️ تعديل الطبقة الحالية")
-        if st.session_state.image_layers:
-            layer = st.session_state.image_layers[st.session_state.current_layer]
-            layer["name"] = st.text_input("اسم الطبقة", value=layer["name"])
-            layer["opacity"] = st.slider("الشفافية", 0.0, 1.0, layer["opacity"], 0.05)
-            layer["visible"] = st.checkbox("ظاهرة", value=layer["visible"])
-        
-        st.markdown("---")
-        st.markdown("### 🧬 FaceMesh")
-        if st.button("🧑 رسم FaceMesh على الطبقة", use_container_width=True):
-            if st.session_state.image_layers:
-                img = get_current_layer_image()
-                if img:
-                    result = draw_face_mesh_on_image(img)
-                    add_layer(result, "FaceMesh")
-                    st.success("✅ تم رسم FaceMesh")
-                    st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🦷 Natural Teeth")
-        if st.button("🦷 إضافة أسنان طبيعية", use_container_width=True):
-            teeth = generate_natural_teeth()
-            add_layer(teeth, "Natural Teeth")
-            st.success("✅ تم إضافة الأسنان الطبيعية")
-            st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🎯 محاكاة واقعية")
-        if st.button("🎯 توليد محاكاة واقعية", type="primary", use_container_width=True):
-            if st.session_state.image_layers:
-                img = get_current_layer_image()
-                if img:
-                    with st.spinner("⏳ جاري توليد المحاكاة الواقعية..."):
-                        _, result = simulate_smile_before_after(img, 0.8)
-                        add_layer(result, "Simulation")
-                        st.success("✅ تم توليد المحاكاة الواقعية!")
-                        st.rerun()
-    
-    with col1:
-        st.markdown("### 📐 مساحة التحرير")
-        if st.session_state.image_layers:
-            display_img = None
-            for layer in st.session_state.image_layers:
-                if layer["visible"] and layer["image"]:
-                    img = layer["image"].copy()
-                    if display_img is None:
-                        display_img = img
-                    else:
-                        try:
-                            display_img = Image.blend(display_img, img, layer["opacity"])
-                        except:
-                            display_img = img
-            if display_img:
-                display_img.thumbnail((700, 500))
-                st.image(display_img, caption="المحرر", use_container_width=True)
-        
-        st.markdown("### 📋 الطبقات")
-        for i, layer in enumerate(st.session_state.image_layers):
-            col_a, col_b, col_c = st.columns([1, 3, 1])
-            with col_a:
-                vis = "👁️" if layer["visible"] else "👁️‍🗨️"
-                if st.button(vis, key=f"vis_{i}"):
-                    layer["visible"] = not layer["visible"]
-                    st.rerun()
-            with col_b:
-                active = " active" if i == st.session_state.current_layer else ""
-                if st.button(f"{layer['name']}", key=f"layer_{i}", use_container_width=True):
-                    st.session_state.current_layer = i
-                    st.rerun()
-            with col_c:
-                if st.button("✕", key=f"del_{i}"):
-                    if 0 <= i < len(st.session_state.image_layers):
-                        st.session_state.image_layers.pop(i)
-                        if st.session_state.current_layer >= len(st.session_state.image_layers):
-                            st.session_state.current_layer = len(st.session_state.image_layers) - 1
-                        st.rerun()
-        
-        col_merge, col_clear = st.columns(2)
-        with col_merge:
-            if st.button("🔗 دمج الكل", use_container_width=True):
-                merge_layers()
-                st.rerun()
-        with col_clear:
-            if st.button("🗑️ مسح الكل", use_container_width=True):
-                st.session_state.image_layers = []
-                st.rerun()
+    if st.session_state.image_layers:
+        display_img = None
+        for layer in st.session_state.image_layers:
+            if layer["visible"] and layer["image"]:
+                if display_img is None:
+                    display_img = layer["image"].copy()
+                else:
+                    try:
+                        display_img = Image.blend(display_img, layer["image"], layer["opacity"])
+                    except:
+                        display_img = layer["image"]
+        if display_img:
+            display_img.thumbnail((700, 500))
+            st.image(display_img, caption="المحرر", use_container_width=True)
 
 # =============================================================
 # PAGE: SUBSCRIPTIONS
@@ -1918,21 +1533,6 @@ def page_image_editor():
 def page_subscriptions():
     st.markdown('<h2>👑 خطط <span style="color:#e67e22;">الاشتراك</span></h2>', unsafe_allow_html=True)
     
-    user = st.session_state.current_user
-    is_owner = user.get("role") == "owner"
-    
-    if is_owner:
-        st.markdown("### 🔧 إدارة الاشتراكات (للمالك)")
-        with st.form("add_subscription"):
-            name = st.text_input("اسم الخطة")
-            price = st.number_input("السعر ($)", min_value=0)
-            features = st.text_area("الميزات (كل ميزة في سطر)")
-            if st.form_submit_button("➕ إضافة خطة"):
-                st.session_state.subscriptions[name] = {"price": price, "features": features.split("\n")}
-                st.success("✅ تم إضافة الخطة")
-                st.rerun()
-    
-    # عرض الخطط
     plans = [("🆓 تجريبي", "$0", ["3 مرضى", "تحليل أساسي"]), ("⭐ شهري", "$99", ["غير محدود", "تحليل AI", "دعم"]), ("🌟 سنوي", "$999", ["جميع الميزات", "دعم أولوي", "تحديثات"])]
     cols = st.columns(3)
     for i, (name, price, feats) in enumerate(plans):
@@ -1944,7 +1544,6 @@ def page_subscriptions():
                 <div style="font-size:0.7rem; color:#94a3b8; margin:8px 0;">
                     {', '.join(feats)}
                 </div>
-                {f'<button onclick="alert("🎉 تم تفعيل الاشتراك {name}!")" style="background:#e67e22; color:#0a0a0a; border:none; padding:8px 24px; border-radius:60px; font-weight:700; cursor:pointer;">اشترك</button>' if not is_owner else ''}
             </div>
             """, unsafe_allow_html=True)
 
@@ -1984,17 +1583,6 @@ def page_vita(): st.markdown('<h2>🎨 ألوان <span style="color:#e67e22;">�
 PAGES = {
     "home": page_home,
     "dashboard": page_dashboard,
-    def page_smile_simulator():
-    import streamlit as st
-    
-    st.title("😁 محاكي الابتسامة")
-    st.write("هنا ستظهر أدوات محاكاة الابتسامة")
-    
-    # أضف محتوى صفحتك هنا
-    uploaded_file = st.file_uploader("ارفع صورة وجه", type=["jpg", "png"])
-    if uploaded_file:
-        st.image(uploaded_file, caption="الصورة المرفوعة")
-        st.success("تم رفع الصورة بنجاح!")
     "smile_simulator": page_smile_simulator,
     "patients": page_patients,
     "new_patient": page_new_patient,
