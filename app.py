@@ -1984,6 +1984,17 @@ def page_vita(): st.markdown('<h2>🎨 ألوان <span style="color:#e67e22;">�
 PAGES = {
     "home": page_home,
     "dashboard": page_dashboard,
+    def page_smile_simulator():
+    import streamlit as st
+    
+    st.title("😁 محاكي الابتسامة")
+    st.write("هنا ستظهر أدوات محاكاة الابتسامة")
+    
+    # أضف محتوى صفحتك هنا
+    uploaded_file = st.file_uploader("ارفع صورة وجه", type=["jpg", "png"])
+    if uploaded_file:
+        st.image(uploaded_file, caption="الصورة المرفوعة")
+        st.success("تم رفع الصورة بنجاح!")
     "smile_simulator": page_smile_simulator,
     "patients": page_patients,
     "new_patient": page_new_patient,
