@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter, ImageOps
 import base64
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
@@ -30,11 +30,12 @@ st.set_page_config(
 )
 
 # =============================================================
-# CSS (نفسه مع إضافات)
+# CSS - RTL & Dark Theme + All Styles
 # =============================================================
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'Cairo', sans-serif;
     direction: rtl;
@@ -73,102 +74,405 @@ html, body, [class*="css"] {
     font-weight: 600;
     border: 1px solid rgba(230,126,34,0.2);
 }
+.badge-harvard {
+    background: #7a0010;
+    color: #fff;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    border: 1px solid #a8001a;
+}
+.badge-private {
+    background: #10b981;
+    color: #fff;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 0.6rem;
+    font-weight: 600;
+}
 .card {
     background: #1e293b;
     border-radius: 12px;
-    padding: 20px;
+    padding: 24px;
     border: 1px solid #334155;
     margin-bottom: 16px;
 }
-.profile-cover {
-    height: 160px;
-    background: linear-gradient(135deg, #075e68, #0a8491);
-    border-radius: 12px 12px 0 0;
-    position: relative;
-    background-size: cover;
-    background-position: center;
+.privacy-badge {
+    display: inline-block;
+    background: rgba(16,185,129,0.12);
+    color: #10b981;
+    padding: 2px 12px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 600;
 }
-.profile-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 4px solid #1e293b;
-    background: #0a8491;
+.dental-chart-wrapper {
+    overflow-x: auto;
+    padding: 10px 0;
+}
+.dental-chart {
     display: flex;
+    flex-direction: column;
     align-items: center;
+    gap: 6px;
+    min-width: 700px;
+}
+.dental-arch {
+    display: flex;
     justify-content: center;
-    font-size: 32px;
-    color: #fff;
-    margin-top: -40px;
-    margin-right: 20px;
-    background-size: cover;
-    background-position: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.dental-arch .arch-label {
+    width: 100%;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: #94a3b8;
+    margin: 4px 0 8px;
+    letter-spacing: 2px;
 }
 .tooth {
-    display: inline-block;
     width: 44px;
     height: 52px;
     background: #f8fafc;
     border: 2px solid #cbd5e1;
     border-radius: 8px 8px 4px 4px;
-    text-align: center;
-    line-height: 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    margin: 2px;
-    font-weight: bold;
+    transition: 0.3s ease;
+    font-size: 11px;
+    font-weight: 700;
     color: #1a2a3a;
-    transition: 0.2s;
+    position: relative;
+    user-select: none;
 }
 .tooth:hover {
-    transform: scale(1.05);
-    border-color: #e67e22;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    border-color: #0a8491;
+}
+.tooth .num {
+    font-size: 9px;
+    opacity: 0.5;
+    margin-top: 2px;
+}
+.tooth .status-icon {
+    font-size: 14px;
+    line-height: 1;
 }
 .tooth.missing {
     background: #f1f3f5;
     border-color: #adb5bd;
     opacity: 0.5;
+    cursor: default;
+}
+.tooth.missing::after {
+    content: '✕';
+    font-size: 20px;
+    color: #ef4444;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+.tooth.missing .num, .tooth.missing .status-icon {
+    display: none;
 }
 .tooth.carious {
     background: #fde8e8;
     border-color: #ef4444;
 }
+.tooth.carious .status-icon {
+    color: #ef4444;
+}
 .tooth.treated {
     background: #d5f5e3;
     border-color: #10b981;
+}
+.tooth.treated .status-icon {
+    color: #10b981;
 }
 .tooth.crown {
     background: #fef9e7;
     border-color: #f59e0b;
 }
+.tooth.crown .status-icon {
+    color: #f59e0b;
+}
 .tooth.root-canal {
     background: #e8daef;
     border-color: #8e44ad;
 }
-.dental-chart {
-    direction: ltr;
+.tooth.root-canal .status-icon {
+    color: #8e44ad;
+}
+.tooth-legend {
     display: flex;
     flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
     justify-content: center;
-    gap: 4px;
-    max-width: 800px;
-    margin: 0 auto;
 }
-.arch-label {
+.tooth-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+}
+.tooth-legend .legend-item .swatch {
+    width: 24px;
+    height: 28px;
+    border-radius: 4px;
+    border: 2px solid #cbd5e1;
+}
+.tooth-legend .legend-item .swatch.normal { background: #f8fafc; }
+.tooth-legend .legend-item .swatch.missing { background: #f1f3f5; opacity: 0.5; }
+.tooth-legend .legend-item .swatch.carious { background: #fde8e8; border-color: #ef4444; }
+.tooth-legend .legend-item .swatch.treated { background: #d5f5e3; border-color: #10b981; }
+.tooth-legend .legend-item .swatch.crown { background: #fef9e7; border-color: #f59e0b; }
+.tooth-legend .legend-item .swatch.root-canal { background: #e8daef; border-color: #8e44ad; }
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+}
+.image-grid .img-item {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid #334155;
+    position: relative;
+    aspect-ratio: 1/1;
+    background: #0f172a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.image-grid .img-item img {
     width: 100%;
-    text-align: center;
-    font-weight: 700;
+    height: 100%;
+    object-fit: cover;
+}
+.image-grid .img-item .remove {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: rgba(239,68,68,0.9);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.image-grid .upload-box {
+    border: 2px dashed #334155;
+    border-radius: 8px;
+    aspect-ratio: 1/1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: 0.3s ease;
     color: #94a3b8;
-    margin: 8px 0;
+    font-size: 13px;
+    background: #1e293b;
+}
+.image-grid .upload-box:hover {
+    border-color: #e67e22;
+    background: rgba(230,126,34,0.05);
+}
+.image-grid .upload-box .icon {
+    font-size: 32px;
+    margin-bottom: 4px;
+}
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background: #075e68;
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    font-weight: 500;
+    z-index: 99999;
+}
+.toast.success { background: #10b981; }
+.toast.error { background: #ef4444; }
+.social-login-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: 0.3s;
+    text-align: center;
+}
+.social-login-btn:hover {
+    background: rgba(230,126,34,0.1);
+    border-color: #e67e22;
+    color: #fff;
+}
+.social-login-btn .icon {
+    font-size: 24px;
+    display: block;
+    margin-bottom: 4px;
+}
+.social-login-btn .label {
+    font-size: 0.7rem;
 }
 .friend-request-card {
     background: #1e293b;
     border: 1px solid #e67e22;
     border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 8px;
+    padding: 16px;
+    margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+.friend-request-card .name {
+    font-weight: 700;
+    color: #f8fafc;
+}
+.friend-request-card .actions {
+    display: flex;
+    gap: 8px;
+}
+.vita-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 4px;
+    margin: 6px 0;
+}
+.vita-item {
+    padding: 8px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #334155;
+    font-size: 10px;
+    background: rgba(0,0,0,0.2);
+    cursor: pointer;
+}
+.vita-item .color-box {
+    width: 100%;
+    height: 24px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    border: 1px solid #334155;
+}
+.preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+.preview-grid .preview-item {
+    border: 1px solid #334155;
+    border-radius: 10px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: #0a0a1a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.preview-grid .preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.preview-grid .preview-item .remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.smile-ai-container {
+    background: #0f172a;
+    border-radius: 12px;
+    padding: 20px;
+    border: 2px solid #e67e22;
+    margin: 10px 0;
+}
+.smile-ai-container .ai-badge {
+    display: inline-block;
+    background: #e67e22;
+    color: #0a0a0a;
+    padding: 2px 14px;
+    border-radius: 20px;
+    font-size: 0.6rem;
+    font-weight: 700;
+}
+.editor-layer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #0f172a;
+    margin-bottom: 4px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.editor-layer.active {
+    border-color: #e67e22;
+    background: rgba(230,126,34,0.05);
+}
+.editor-layer .layer-name {
+    flex: 1;
+    font-size: 0.85rem;
+}
+.editor-layer .layer-vis {
+    width: 20px;
+    text-align: center;
+}
+.comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.comparison-table th {
+    background: #0a8491;
+    color: #fff;
+    padding: 8px;
+    text-align: center;
+}
+.comparison-table td {
+    padding: 6px;
+    border-bottom: 1px solid #334155;
+    text-align: center;
+}
+.comparison-table .normal { color: #10b981; }
+.comparison-table .warning { color: #f59e0b; }
+.comparison-table .abnormal { color: #ef4444; }
+@media (max-width: 640px) {
+    .grid-2, .grid-3, .grid-4, .grid-5 {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 """
@@ -297,6 +601,14 @@ if "smile_designs" not in st.session_state:
     st.session_state.smile_designs = []
 if "facial_analysis_results" not in st.session_state:
     st.session_state.facial_analysis_results = []
+if "lab_phone" not in st.session_state:
+    st.session_state.lab_phone = ""
+if "editor_image" not in st.session_state:
+    st.session_state.editor_image = None
+if "ceph_image" not in st.session_state:
+    st.session_state.ceph_image = None
+if "cad_model" not in st.session_state:
+    st.session_state.cad_model = None
 
 # =============================================================
 # AUTH FUNCTIONS
@@ -357,7 +669,7 @@ def get_user_by_username(username):
     return None
 
 # =============================================================
-# IMAGE PROCESSING
+# IMAGE PROCESSING FUNCTIONS
 # =============================================================
 mp_face_mesh = mp.solutions.face_mesh
 
@@ -442,7 +754,6 @@ def draw_landmarks_on_image(image, count=478):
         x = random.randint(10, w-10)
         y = random.randint(10, h-10)
         draw.ellipse([x-3, y-3, x+3, y+3], fill=random.choice(colors))
-    # خطوط مرجعية
     draw.line([(w*0.2, h*0.1), (w*0.8, h*0.1)], fill='#e67e22', width=2)
     draw.line([(w*0.2, h*0.9), (w*0.8, h*0.9)], fill='#e67e22', width=2)
     draw.line([(w*0.5, h*0.1), (w*0.5, h*0.9)], fill='#10b981', width=2)
@@ -495,8 +806,85 @@ def merge_layers():
         st.session_state.image_layers = [{"name": "Merged", "image": base, "visible": True, "opacity": 1.0}]
         st.session_state.current_layer = 0
 
+def pil_to_base64(img):
+    buffered = BytesIO()
+    img.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode()
+
 # =============================================================
-# PAGE: DENTAL CHART (تفاعلي)
+# PAGE: HOME
+# =============================================================
+def page_home():
+    st.markdown("""
+    <div style="text-align:center; padding:30px 0;">
+        <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <span class="badge-gold">AI-Powered · 3D Planning</span>
+        </div>
+        <h1 style="font-size:2.4rem; font-weight:800;">تشخيص دقيق <span style="color:#e67e22;">بذكاء اصطناعي</span></h1>
+        <p style="color:#94a3b8; font-size:1.1rem; max-width:600px; margin:12px auto;">
+            منصة متكاملة لطب الأسنان التجميلي مع محاكاة الواقع الافتراضي والذكاء الاصطناعي.
+        </p>
+        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+            <span class="badge-gold">🦷 32 سن</span>
+            <span class="badge-gold">🧠 478 معلم</span>
+            <span class="badge-gold">📐 8 زوايا</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# =============================================================
+# PAGE: DASHBOARD
+# =============================================================
+def page_dashboard():
+    st.markdown('<h2>📊 لوحة التحكم</h2>', unsafe_allow_html=True)
+    st.markdown(f"<p style='color:#94a3b8;'>مرحباً بك، <strong>{st.session_state.current_user['name']}</strong></p>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("👨‍⚕️ المرضى", len(st.session_state.patients))
+    with c2:
+        st.metric("📅 المواعيد", len(st.session_state.appointments))
+    with c3:
+        st.metric("🧠 الصور المُنتجة", len(st.session_state.generated_images))
+    with c4:
+        st.metric("👥 الأصدقاء", len(st.session_state.current_user.get("friends", [])))
+
+# =============================================================
+# PAGE: PATIENTS
+# =============================================================
+def page_patients():
+    st.markdown('<h2>👨‍⚕️ قائمة المرضى</h2>', unsafe_allow_html=True)
+    if st.button("➕ مريض جديد", type="primary"):
+        st.session_state.current_page = "new_patient"
+        st.rerun()
+    if st.session_state.patients:
+        df = pd.DataFrame(st.session_state.patients)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("لا يوجد مرضى")
+
+def page_new_patient():
+    st.markdown('<h2>📝 إضافة مريض جديد</h2>', unsafe_allow_html=True)
+    with st.form("new_patient_form"):
+        name = st.text_input("الاسم الكامل *")
+        age = st.number_input("العمر", min_value=0, max_value=120, value=30)
+        phone = st.text_input("رقم الهاتف")
+        gender = st.selectbox("الجنس", ["ذكر", "أنثى", "غير محدد"])
+        complaint = st.text_area("الشكوى الرئيسية")
+        if st.form_submit_button("💾 حفظ المريض", use_container_width=True) and name:
+            st.session_state.patients.append({
+                "id": f"P{len(st.session_state.patients)+1:04d}",
+                "name": name,
+                "age": age,
+                "phone": phone,
+                "gender": gender,
+                "complaint": complaint,
+                "created_at": datetime.now().isoformat()
+            })
+            st.success("تم إضافة المريض!")
+            st.rerun()
+
+# =============================================================
+# PAGE: DENTAL CHART (مخطط الأسنان التفاعلي)
 # =============================================================
 def page_dental_chart():
     st.markdown('<h2>🦷 مخطط الأسنان التفاعلي</h2>', unsafe_allow_html=True)
@@ -510,6 +898,14 @@ def page_dental_chart():
         'treated': '✔️',
         'crown': '👑',
         'root-canal': '🧬'
+    }
+    status_classes = {
+        'normal': '',
+        'missing': 'missing',
+        'carious': 'carious',
+        'treated': 'treated',
+        'crown': 'crown',
+        'root-canal': 'root-canal'
     }
     status_cycle = ['normal', 'missing', 'carious', 'treated', 'crown', 'root-canal']
     
@@ -562,7 +958,7 @@ def page_dental_chart():
             st.success("تم حفظ المخطط!")
 
 # =============================================================
-# PAGE: NATURAL TEETH (مع تحكم كامل)
+# PAGE: NATURAL TEETH (الأسنان الطبيعية)
 # =============================================================
 def page_natural_teeth():
     st.markdown('<h2>🦷 الأسنان الطبيعية - تحكم كامل</h2>', unsafe_allow_html=True)
@@ -623,12 +1019,254 @@ def page_natural_teeth():
             st.info("لم تقم بتوليد أسنان بعد.")
 
 # =============================================================
-# PAGE: DENTBOOK (فيسبوك طبي كامل)
+# PAGE: IMAGE EDITOR (محرر الصور المتقدم)
+# =============================================================
+def page_image_editor():
+    st.markdown('<h2>🎨 محرر الصور المتقدم (Photopea-like)</h2>', unsafe_allow_html=True)
+    st.caption("تحكم كامل بالطبقات، إضافة أسنان طبيعية، محاكاة واقعية بالذكاء الاصطناعي")
+    
+    if not st.session_state.image_layers:
+        base_img = Image.new('RGB', (800, 600), color='#1a1a2e')
+        draw = ImageDraw.Draw(base_img)
+        draw.text((400, 300), "🦷 ارفع صورة لبدء التحرير", fill='#94a3b8', anchor="mm")
+        st.session_state.image_layers = [{"name": "Background", "image": base_img, "visible": True, "opacity": 1.0}]
+        st.session_state.current_layer = 0
+    
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        st.markdown("### 🛠️ الأدوات")
+        uploaded = st.file_uploader("📤 رفع صورة", type=["jpg","png","jpeg"], key="editor_upload")
+        if uploaded:
+            img = Image.open(uploaded)
+            add_layer(img, f"Layer {len(st.session_state.image_layers)}")
+            st.success("تم إضافة الطبقة")
+            st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### 🎚️ تعديل الطبقة الحالية")
+        if st.session_state.image_layers:
+            layer = st.session_state.image_layers[st.session_state.current_layer]
+            layer["name"] = st.text_input("اسم الطبقة", value=layer["name"])
+            layer["opacity"] = st.slider("الشفافية", 0.0, 1.0, layer["opacity"], 0.05)
+            layer["visible"] = st.checkbox("ظاهرة", value=layer["visible"])
+        
+        st.markdown("---")
+        st.markdown("### 🧬 FaceMesh")
+        if st.button("🧑 رسم FaceMesh على الطبقة", use_container_width=True):
+            img = get_current_layer_image()
+            if img:
+                result = draw_face_mesh_on_image(img)
+                add_layer(result, "FaceMesh")
+                st.success("تم رسم FaceMesh")
+                st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### 🦷 Natural Teeth")
+        if st.button("🦷 توليد أسنان طبيعية", use_container_width=True):
+            teeth = generate_natural_teeth()
+            add_layer(teeth, "Natural Teeth")
+            st.success("تم إضافة الأسنان الطبيعية")
+            st.rerun()
+        
+        st.markdown("### 🎛️ تحكم بالأسنان")
+        if st.session_state.natural_teeth_layers:
+            selected = st.selectbox("اختر مجموعة أسنان", [f"{i+1}: {t['name']}" for i, t in enumerate(st.session_state.natural_teeth_layers)])
+            idx = int(selected.split(":")[0]) - 1 if selected else 0
+            teeth = st.session_state.natural_teeth_layers[idx]
+            st.image(teeth["image"], caption="المجموعة المختارة", use_container_width=True)
+            rotation = st.slider("تدوير", -180, 180, 0)
+            scale = st.slider("تكبير/تصغير", 0.5, 2.0, 1.0, 0.1)
+            if st.button("تطبيق التعديلات", use_container_width=True):
+                img = teeth["image"]
+                if rotation != 0:
+                    img = img.rotate(rotation, expand=True)
+                if scale != 1.0:
+                    w, h = img.size
+                    img = img.resize((int(w*scale), int(h*scale)))
+                if st.session_state.image_layers:
+                    st.session_state.image_layers[st.session_state.current_layer]["image"] = img
+                    st.success("تم تطبيق التعديلات")
+                    st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### 🎯 محاكاة واقعية بالذكاء الاصطناعي")
+        prompt = st.text_input("وصف الصورة المطلوب إنتاجها بعد العلاج:", placeholder="مثال: ابتسامة هوليوودية، أسنان بيضاء...")
+        if st.button("🎯 توليد محاكاة واقعية", type="primary", use_container_width=True):
+            img = get_current_layer_image()
+            if img:
+                with st.spinner("جاري توليد المحاكاة الواقعية..."):
+                    _, result = simulate_smile_before_after(img, 0.8)
+                    add_layer(result, "Simulation")
+                    if prompt:
+                        draw = ImageDraw.Draw(result)
+                        try:
+                            font = ImageFont.truetype("arial.ttf", 16)
+                        except:
+                            font = ImageFont.load_default()
+                        draw.text((10, 10), f"📝 {prompt[:40]}", fill='#e67e22', font=font)
+                    st.success("تم توليد المحاكاة الواقعية!")
+                    st.rerun()
+    
+    with col1:
+        st.markdown("### 📐 مساحة التحرير")
+        if st.session_state.image_layers:
+            display_img = None
+            for layer in st.session_state.image_layers:
+                if layer["visible"] and layer["image"]:
+                    img = layer["image"].copy()
+                    if display_img is None:
+                        display_img = img
+                    else:
+                        try:
+                            display_img = Image.blend(display_img, img, layer["opacity"])
+                        except:
+                            display_img = img
+            if display_img:
+                display_img.thumbnail((700, 500))
+                st.image(display_img, caption="المحرر", use_container_width=True)
+        
+        st.markdown("### 📋 الطبقات")
+        for i, layer in enumerate(st.session_state.image_layers):
+            col_a, col_b, col_c = st.columns([1, 3, 1])
+            with col_a:
+                vis = "👁️" if layer["visible"] else "👁️‍🗨️"
+                if st.button(vis, key=f"vis_{i}"):
+                    layer["visible"] = not layer["visible"]
+                    st.rerun()
+            with col_b:
+                active = " active" if i == st.session_state.current_layer else ""
+                if st.button(f"{layer['name']}", key=f"layer_{i}", use_container_width=True):
+                    st.session_state.current_layer = i
+                    st.rerun()
+            with col_c:
+                if st.button("✕", key=f"del_{i}"):
+                    if 0 <= i < len(st.session_state.image_layers):
+                        st.session_state.image_layers.pop(i)
+                        if st.session_state.current_layer >= len(st.session_state.image_layers):
+                            st.session_state.current_layer = len(st.session_state.image_layers) - 1
+                        st.rerun()
+        
+        col_merge, col_clear = st.columns(2)
+        with col_merge:
+            if st.button("🔗 دمج الكل", use_container_width=True):
+                merge_layers()
+                st.rerun()
+        with col_clear:
+            if st.button("🗑️ مسح الكل", use_container_width=True):
+                st.session_state.image_layers = []
+                st.rerun()
+
+# =============================================================
+# PAGE: CEPHALOMETRIC ANALYSIS (تحليل الأشعة مع AI)
+# =============================================================
+def page_cephalometric():
+    st.markdown('<h2>🩻 تحليل الأشعة السيفالومترية بالذكاء الاصطناعي</h2>', unsafe_allow_html=True)
+    st.caption("تحليل متقدم مع رسم الزوايا والخطوط، جدول مقارنة، وتقرير ذكي")
+    
+    uploaded = st.file_uploader("🩻 حمّل صورة الأشعة", type=["jpg","png","dcm"], key="ceph_img")
+    if uploaded:
+        img = Image.open(uploaded)
+        st.session_state.ceph_image = img
+        st.image(img, caption="صورة الأشعة", use_container_width=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("🎨 رسم التحليل على الأشعة", use_container_width=True):
+                with st.spinner("جاري رسم الزوايا والخطوط..."):
+                    result = draw_landmarks_on_image(img, 50)
+                    draw = ImageDraw.Draw(result)
+                    w, h = result.size
+                    draw.line([(int(w*0.2), 0), (int(w*0.2), h)], fill='#e67e22', width=3)
+                    draw.line([(int(w*0.8), 0), (int(w*0.8), h)], fill='#e67e22', width=3)
+                    draw.line([(0, int(h*0.3)), (w, int(h*0.3))], fill='#10b981', width=3)
+                    draw.line([(0, int(h*0.7)), (w, int(h*0.7))], fill='#10b981', width=3)
+                    draw.text((10,10), "SNA: 82°", fill='#e67e22')
+                    draw.text((10,30), "SNB: 80°", fill='#e67e22')
+                    draw.text((10,50), "ANB: 2°", fill='#e67e22')
+                    st.image(result, caption="الأشعة مع التحليل", use_container_width=True)
+                    buffered = BytesIO()
+                    result.save(buffered, format="PNG")
+                    img_str = base64.b64encode(buffered.getvalue()).decode()
+                    st.session_state.generated_images.append({
+                        "name": f"ceph_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}",
+                        "data": img_str,
+                        "type": "cephalometric",
+                        "created_at": datetime.now().isoformat()
+                    })
+                    st.success("تم رسم التحليل!")
+        
+        with col2:
+            if st.button("🤖 تحليل AI للأشعة", type="primary", use_container_width=True):
+                with st.spinner("جاري التحليل الذكي..."):
+                    time.sleep(2)
+                    st.session_state.cephalometric_data = {
+                        "SNA": random.randint(78,86),
+                        "SNB": random.randint(76,84),
+                        "ANB": random.randint(0,4),
+                        "SN-MP": random.randint(28,36),
+                        "FMA": random.randint(20,30),
+                        "IMPA": random.randint(85,95),
+                        "Overjet": random.randint(1,5),
+                        "Overbite": random.randint(1,4)
+                    }
+                    st.success("تم التحليل!")
+                    data = st.session_state.cephalometric_data
+                    normal = st.session_state.normal_values
+                    html = '<table class="comparison-table"><thead><tr><th>الزاوية</th><th>قيمة المريض</th><th>القيمة الطبيعية</th><th>الفرق</th><th>الحالة</th></tr></thead><tbody>'
+                    for key in ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"]:
+                        val = data.get(key, 0)
+                        norm = normal.get(key, 0)
+                        diff = val - norm
+                        status = "طبيعي ✅" if abs(diff) <= 2 else "مقبول ⚠️" if abs(diff) <= 4 else "غير طبيعي ❌"
+                        cls = "normal" if abs(diff) <= 2 else "warning" if abs(diff) <= 4 else "abnormal"
+                        html += f'<tr><td>{key}</td><td>{val}</td><td>{norm}</td><td>{diff:+.1f}</td><td class="{cls}">{status}</td></tr>'
+                    html += '</tbody></table>'
+                    st.markdown(html, unsafe_allow_html=True)
+                    
+                    df_comp = pd.DataFrame({
+                        "الزاوية": ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"],
+                        "قيمة المريض": [data.get(k,0) for k in ["SNA","SNB","ANB","SN-MP","FMA","IMPA","Overjet","Overbite"]],
+                        "القيمة الطبيعية": [normal.get(k,0) for k in ["SNA","SNB","ANB","SN-MP","FMA","IMPA","Overjet","Overbite"]]
+                    })
+                    df_comp["الفرق"] = df_comp["قيمة المريض"] - df_comp["القيمة الطبيعية"]
+                    st.dataframe(df_comp, use_container_width=True)
+                    
+                    # رسم بياني
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(x=df_comp["الزاوية"], y=df_comp["قيمة المريض"], name="قيمة المريض", marker_color="#e67e22"))
+                    fig.add_trace(go.Bar(x=df_comp["الزاوية"], y=df_comp["القيمة الطبيعية"], name="القيمة الطبيعية", marker_color="#0a8491"))
+                    fig.update_layout(title="مقارنة قيم المريض مع القيم الطبيعية", barmode='group', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        with col3:
+            if st.button("📊 توليد جدول المقارنة", use_container_width=True):
+                data = st.session_state.cephalometric_data
+                normal = st.session_state.normal_values
+                df = pd.DataFrame({
+                    "الزاوية": list(data.keys()),
+                    "قيمة المريض": list(data.values()),
+                    "القيمة الطبيعية": [normal.get(k,0) for k in data.keys()]
+                })
+                df["الفرق"] = df["قيمة المريض"] - df["القيمة الطبيعية"]
+                st.table(df)
+                st.success("تم توليد الجدول")
+    
+    # عرض الصور المُنتجة
+    st.markdown("### 📸 الصور المُنتجة")
+    if st.session_state.generated_images:
+        cols = st.columns(4)
+        for i, img in enumerate(st.session_state.generated_images[-8:]):
+            with cols[i % 4]:
+                st.image(f"data:image/png;base64,{img['data']}", caption=img.get('name', 'صورة'), use_container_width=True)
+    else:
+        st.info("لا توجد صور مُنتجة بعد")
+
+# =============================================================
+# PAGE: DENTBOOK (الشبكة الاجتماعية الطبية)
 # =============================================================
 def page_dentbook():
     st.markdown('<h2>📱 Dentbook - الشبكة الاجتماعية الطبية</h2>', unsafe_allow_html=True)
     
-    # إنشاء منشور جديد
     with st.container():
         col1, col2 = st.columns([1, 6])
         with col1:
@@ -664,7 +1302,6 @@ def page_dentbook():
     
     st.markdown("---")
     
-    # عرض المنشورات
     for idx, post in enumerate(st.session_state.dentbook_posts):
         user = st.session_state.current_user
         is_liked = user["email"] in post.get("liked_by", [])
@@ -698,10 +1335,16 @@ def page_dentbook():
                         🔄 {post.get('shares', 0)}
                     </button>
                 </div>
+                {f'''
+                <div style="margin-top:8px; border-top:1px solid #2d3748; padding-top:8px;">
+                    {''.join([f'<div style="display:flex; gap:6px; margin-bottom:4px;"><strong>{c["author"]}:</strong> {c["text"]}</div>' for c in comments[-3:]])}
+                    <input type="text" placeholder="اكتب تعليقاً..." style="width:100%; padding:6px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#f8fafc;" />
+                    <button onclick="alert('تم إضافة التعليق!')" style="margin-top:4px; background:#0a8491; color:#fff; border:none; padding:2px 14px; border-radius:20px; cursor:pointer;">تعليق</button>
+                </div>
+                ''' if comments else ''}
             </div>
             """, unsafe_allow_html=True)
             
-            # أزرار الإعجاب والتعليق الفعلية
             col1, col2, col3 = st.columns([1,1,4])
             with col1:
                 if st.button(f"❤️ {like_count}", key=f"like_{idx}"):
@@ -721,102 +1364,12 @@ def page_dentbook():
                     st.success("تمت المشاركة!")
 
 # =============================================================
-# PAGE: CEPHALOMETRIC (تحليل الأشعة مع AI)
-# =============================================================
-def page_cephalometric():
-    st.markdown('<h2>🩻 تحليل الأشعة السيفالومترية</h2>', unsafe_allow_html=True)
-    st.caption("تحليل متقدم مع رسم الزوايا والخطوط، جدول مقارنة، وتقرير ذكي")
-    
-    uploaded = st.file_uploader("🩻 حمّل صورة الأشعة", type=["jpg","png","dcm"], key="ceph_img")
-    if uploaded:
-        img = Image.open(uploaded)
-        st.image(img, caption="صورة الأشعة", use_container_width=True)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("🎨 رسم التحليل على الأشعة", use_container_width=True):
-                with st.spinner("جاري رسم الزوايا والخطوط..."):
-                    result = draw_landmarks_on_image(img, 50)
-                    draw = ImageDraw.Draw(result)
-                    w, h = result.size
-                    draw.line([(int(w*0.2), 0), (int(w*0.2), h)], fill='#e67e22', width=3)
-                    draw.line([(int(w*0.8), 0), (int(w*0.8), h)], fill='#e67e22', width=3)
-                    draw.line([(0, int(h*0.3)), (w, int(h*0.3))], fill='#10b981', width=3)
-                    draw.line([(0, int(h*0.7)), (w, int(h*0.7))], fill='#10b981', width=3)
-                    draw.text((10,10), "SNA: 82°", fill='#e67e22')
-                    draw.text((10,30), "SNB: 80°", fill='#e67e22')
-                    draw.text((10,50), "ANB: 2°", fill='#e67e22')
-                    st.image(result, caption="الأشعة مع التحليل", use_container_width=True)
-                    buffered = BytesIO()
-                    result.save(buffered, format="PNG")
-                    img_str = base64.b64encode(buffered.getvalue()).decode()
-                    st.session_state.generated_images.append({
-                        "name": f"ceph_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}",
-                        "data": img_str,
-                        "type": "cephalometric",
-                        "created_at": datetime.now().isoformat()
-                    })
-                    st.success("تم رسم التحليل!")
-        
-        with col2:
-            if st.button("🤖 تحليل AI للأشعة", type="primary", use_container_width=True):
-                with st.spinner("جاري التحليل الذكي..."):
-                    time.sleep(2)
-                    # تحديث البيانات العشوائية
-                    st.session_state.cephalometric_data = {
-                        "SNA": random.randint(78,86),
-                        "SNB": random.randint(76,84),
-                        "ANB": random.randint(0,4),
-                        "SN-MP": random.randint(28,36),
-                        "FMA": random.randint(20,30),
-                        "IMPA": random.randint(85,95),
-                        "Overjet": random.randint(1,5),
-                        "Overbite": random.randint(1,4)
-                    }
-                    st.success("تم التحليل!")
-                    # عرض النتائج
-                    data = st.session_state.cephalometric_data
-                    normal = st.session_state.normal_values
-                    html = '<table class="comparison-table"><thead><tr><th>الزاوية</th><th>قيمة المريض</th><th>القيمة الطبيعية</th><th>الفرق</th><th>الحالة</th></tr></thead><tbody>'
-                    for key in ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"]:
-                        val = data.get(key, 0)
-                        norm = normal.get(key, 0)
-                        diff = val - norm
-                        status = "طبيعي ✅" if abs(diff) <= 2 else "مقبول ⚠️" if abs(diff) <= 4 else "غير طبيعي ❌"
-                        cls = "normal" if abs(diff) <= 2 else "warning" if abs(diff) <= 4 else "abnormal"
-                        html += f'<tr><td>{key}</td><td>{val}</td><td>{norm}</td><td>{diff:+.1f}</td><td class="{cls}">{status}</td></tr>'
-                    html += '</tbody></table>'
-                    st.markdown(html, unsafe_allow_html=True)
-                    
-                    df_comp = pd.DataFrame({
-                        "الزاوية": ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"],
-                        "قيمة المريض": [data.get(k,0) for k in ["SNA","SNB","ANB","SN-MP","FMA","IMPA","Overjet","Overbite"]],
-                        "القيمة الطبيعية": [normal.get(k,0) for k in ["SNA","SNB","ANB","SN-MP","FMA","IMPA","Overjet","Overbite"]]
-                    })
-                    df_comp["الفرق"] = df_comp["قيمة المريض"] - df_comp["القيمة الطبيعية"]
-                    st.dataframe(df_comp, use_container_width=True)
-        
-        with col3:
-            if st.button("📊 توليد جدول المقارنة", use_container_width=True):
-                data = st.session_state.cephalometric_data
-                normal = st.session_state.normal_values
-                df = pd.DataFrame({
-                    "الزاوية": list(data.keys()),
-                    "قيمة المريض": list(data.values()),
-                    "القيمة الطبيعية": [normal.get(k,0) for k in data.keys()]
-                })
-                df["الفرق"] = df["قيمة المريض"] - df["القيمة الطبيعية"]
-                st.table(df)
-                st.success("تم توليد الجدول")
-
-# =============================================================
-# PAGE: FRIENDS (مع قبول ورفض وبحث)
+# PAGE: FRIENDS (الأصدقاء وطلبات الصداقة)
 # =============================================================
 def page_friends():
     st.markdown('<h2>🤝 الأصدقاء وطلبات الصداقة</h2>', unsafe_allow_html=True)
     user = st.session_state.current_user
     
-    # طلبات الصداقة الواردة
     st.markdown("### 📨 طلبات الصداقة الواردة")
     incoming = [r for r in st.session_state.friend_requests if r["to"] == user["email"] and r["status"] == "pending"]
     if incoming:
@@ -833,7 +1386,7 @@ def page_friends():
                             user["friends"].append(from_user["email"])
                         if user["email"] not in from_user.get("friends", []):
                             from_user["friends"].append(user["email"])
-                        st.success("تم قبول الصداقة!")
+                        st.success("✅ تم قبول الصداقة!")
                         st.rerun()
                 with col3:
                     if st.button("❌ رفض", key=f"reject_{req['from']}"):
@@ -843,7 +1396,6 @@ def page_friends():
     else:
         st.info("📭 لا توجد طلبات صداقة واردة")
     
-    # بحث عن أشخاص
     st.markdown("### 🔍 بحث عن أشخاص")
     search = st.text_input("ابحث بالاسم أو البريد الإلكتروني")
     if search:
@@ -880,7 +1432,6 @@ def page_friends():
         else:
             st.info("لا توجد نتائج")
     
-    # عرض الأصدقاء
     st.markdown("### 👫 قائمة الأصدقاء")
     friends_list = user.get("friends", [])
     if friends_list:
@@ -899,7 +1450,7 @@ def page_friends():
         st.info("👤 لا يوجد أصدقاء بعد")
 
 # =============================================================
-# PAGE: PROFILE (مع غلاف وصورة شخصية ومنشورات)
+# PAGE: PROFILE (الملف الشخصي مع غلاف وصورة)
 # =============================================================
 def page_profile():
     st.markdown('<h2>👤 الملف الشخصي</h2>', unsafe_allow_html=True)
@@ -909,14 +1460,14 @@ def page_profile():
     avatar_style = f"background-image: url(data:image/png;base64,{user['avatar']});" if user.get('avatar') else ""
     
     st.markdown(f"""
-    <div class="profile-cover" style="{cover_style} height:200px;">
+    <div style="height:160px; background:linear-gradient(135deg,#075e68,#0a8491); border-radius:12px 12px 0 0; position:relative; background-size:cover; background-position:center; {cover_style}">
         <div style="position:absolute; bottom:8px; left:8px;">
             <button onclick="document.getElementById('coverUpload').click()" style="background:rgba(0,0,0,0.5); color:#fff; border:none; padding:4px 14px; border-radius:30px; font-size:0.7rem; cursor:pointer;">تغيير الغلاف</button>
             <input type="file" id="coverUpload" accept="image/*" style="display:none;" />
         </div>
     </div>
     <div style="display:flex; align-items:flex-end; gap:16px; padding:0 16px 16px; margin-top:-50px; position:relative; z-index:2; flex-wrap:wrap;">
-        <div class="profile-avatar" style="{avatar_style}">
+        <div style="width:80px; height:80px; border-radius:50%; border:4px solid #1e293b; background:#0a8491; display:flex; align-items:center; justify-content:center; font-size:32px; color:#fff; background-size:cover; background-position:center; {avatar_style}">
             {user['name'][0] if not user.get('avatar') else ''}
         </div>
         <div>
@@ -931,7 +1482,6 @@ def page_profile():
     </div>
     """, unsafe_allow_html=True)
     
-    # رفع الغلاف والصورة الشخصية
     cover_file = st.file_uploader("اختر صورة الغلاف", type=["jpg","png"], key="cover_uploader", label_visibility="collapsed")
     if cover_file:
         img = Image.open(cover_file)
@@ -952,7 +1502,6 @@ def page_profile():
         st.success("تم تحديث الصورة الشخصية")
         st.rerun()
     
-    # تعديل المعلومات
     with st.form("profile_edit"):
         name = st.text_input("الاسم", value=user.get("name", ""))
         username = st.text_input("اسم المستخدم", value=user.get("username", ""))
@@ -968,7 +1517,6 @@ def page_profile():
             st.session_state.users_db[user["email"]].update(user)
             st.success("تم الحفظ!")
     
-    # عرض المنشورات
     st.markdown("### 📌 منشوراتي")
     posts = user.get("posts", [])
     if posts:
@@ -983,7 +1531,7 @@ def page_profile():
         st.info("لا توجد منشورات بعد")
 
 # =============================================================
-# PAGE: PRIVATE MESSAGES (مشفرة)
+# PAGE: PRIVATE MESSAGES (رسائل خاصة مشفرة)
 # =============================================================
 def page_private_messages():
     st.markdown('<h2>💌 رسائل خاصة مشفرة</h2>', unsafe_allow_html=True)
@@ -1024,9 +1572,18 @@ def page_private_messages():
                 })
                 st.success("تم إرسال الرسالة مشفرة!")
                 st.rerun()
+    
+    # محاكاة مكالمات
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📹 مكالمة فيديو", use_container_width=True):
+            st.info("جاري بدء مكالمة فيديو... (محاكاة)")
+    with col2:
+        if st.button("📞 مكالمة صوتية", use_container_width=True):
+            st.info("جاري بدء مكالمة صوتية... (محاكاة)")
 
 # =============================================================
-# PAGE: LAB CHAT (مع رفع ملفات)
+# PAGE: LAB CHAT (التواصل مع المختبر)
 # =============================================================
 def page_lab_chat():
     st.markdown('<h2>🧪 التواصل مع المختبر</h2>', unsafe_allow_html=True)
@@ -1082,7 +1639,7 @@ def page_lab_chat():
             st.rerun()
 
 # =============================================================
-# PAGE: FILE SHARING (مع تحميل)
+# PAGE: FILE SHARING (مشاركة الملفات مع تحميل)
 # =============================================================
 def page_file_sharing():
     st.markdown('<h2>📁 مشاركة الملفات</h2>', unsafe_allow_html=True)
@@ -1114,7 +1671,7 @@ def page_file_sharing():
                 st.rerun()
 
 # =============================================================
-# PAGE: SUBSCRIPTIONS (إدارة للمالك)
+# PAGE: SUBSCRIPTIONS (إدارة الاشتراكات)
 # =============================================================
 def page_subscriptions():
     st.markdown('<h2>👑 خطط الاشتراك</h2>', unsafe_allow_html=True)
@@ -1134,7 +1691,7 @@ def page_subscriptions():
                     st.rerun()
         
         st.markdown("### قائمة الخطط الحالية")
-        for plan_name, plan_data in st.session_state.subscriptions.items():
+        for plan_name, plan_data in list(st.session_state.subscriptions.items()):
             col1, col2, col3 = st.columns([2,2,1])
             with col1:
                 st.write(f"**{plan_name}**")
@@ -1158,7 +1715,7 @@ def page_subscriptions():
             """, unsafe_allow_html=True)
 
 # =============================================================
-# PAGE: REPORTS (مع تصدير وطباعة ومشاركة)
+# PAGE: REPORTS (التقارير مع تصدير وطباعة ومشاركة)
 # =============================================================
 def page_reports():
     st.markdown('<h2>📄 التقارير الشاملة</h2>', unsafe_allow_html=True)
@@ -1186,7 +1743,7 @@ def page_reports():
             """, unsafe_allow_html=True)
     with col3:
         if st.button("📤 مشاركة واتساب", use_container_width=True):
-            st.success("تم فتح واتساب!")
+            st.success("✅ تم فتح واتساب!")
             st.markdown("""
             <script>
             window.open('https://api.whatsapp.com/send?text=📄 تقرير HarmonizeAI', '_blank');
@@ -1203,11 +1760,11 @@ def page_reports():
         st.info("لا توجد صور مُنتجة بعد")
 
 # =============================================================
-# PAGE: CAD/CAM (نموذج 3D وهمي)
+# PAGE: CAD/CAM (عارض 3D)
 # =============================================================
 def page_cadcam():
     st.markdown('<h2>⚙️ CAD/CAM & 3D</h2>', unsafe_allow_html=True)
-    st.caption("عرض نموذج ثلاثي الأبعاد افتراضي (محاكاة)")
+    st.caption("عرض نموذج ثلاثي الأبعاد تفاعلي (محاكاة)")
     
     st.components.v1.html("""
     <!DOCTYPE html>
@@ -1289,198 +1846,8 @@ def page_forum():
             """, unsafe_allow_html=True)
 
 # =============================================================
-# PAGE: IMAGE EDITOR (مع أسنان طبيعية ومحاكاة واقعية)
+# PAGE: OTHER (مختصرة)
 # =============================================================
-def page_image_editor():
-    st.markdown('<h2>🎨 محرر الصور المتقدم (Photopea-like)</h2>', unsafe_allow_html=True)
-    st.caption("تحكم كامل بالطبقات، إضافة أسنان طبيعية، محاكاة واقعية بالذكاء الاصطناعي")
-    
-    if not st.session_state.image_layers:
-        base_img = Image.new('RGB', (800, 600), color='#1a1a2e')
-        draw = ImageDraw.Draw(base_img)
-        draw.text((400, 300), "🦷 ارفع صورة لبدء التحرير", fill='#94a3b8', anchor="mm")
-        st.session_state.image_layers = [{"name": "Background", "image": base_img, "visible": True, "opacity": 1.0}]
-        st.session_state.current_layer = 0
-    
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        st.markdown("### 🛠️ الأدوات")
-        uploaded = st.file_uploader("📤 رفع صورة", type=["jpg","png","jpeg"], key="editor_upload")
-        if uploaded:
-            img = Image.open(uploaded)
-            add_layer(img, f"Layer {len(st.session_state.image_layers)}")
-            st.success("تم إضافة الطبقة")
-            st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🎚️ تعديل الطبقة الحالية")
-        if st.session_state.image_layers:
-            layer = st.session_state.image_layers[st.session_state.current_layer]
-            layer["name"] = st.text_input("اسم الطبقة", value=layer["name"])
-            layer["opacity"] = st.slider("الشفافية", 0.0, 1.0, layer["opacity"], 0.05)
-            layer["visible"] = st.checkbox("ظاهرة", value=layer["visible"])
-        
-        st.markdown("---")
-        st.markdown("### 🧬 FaceMesh")
-        if st.button("🧑 رسم FaceMesh على الطبقة", use_container_width=True):
-            img = get_current_layer_image()
-            if img:
-                result = draw_face_mesh_on_image(img)
-                add_layer(result, "FaceMesh")
-                st.success("تم رسم FaceMesh")
-                st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🦷 Natural Teeth")
-        if st.button("🦷 توليد أسنان طبيعية", use_container_width=True):
-            teeth = generate_natural_teeth()
-            add_layer(teeth, "Natural Teeth")
-            st.success("تم إضافة الأسنان الطبيعية")
-            st.rerun()
-        
-        # التحكم بالأسنان الطبيعية (حجم، دوران، موضع)
-        st.markdown("### 🎛️ تحكم بالأسنان")
-        if st.session_state.natural_teeth_layers:
-            selected = st.selectbox("اختر مجموعة أسنان", [f"{i+1}: {t['name']}" for i, t in enumerate(st.session_state.natural_teeth_layers)])
-            idx = int(selected.split(":")[0]) - 1 if selected else 0
-            teeth = st.session_state.natural_teeth_layers[idx]
-            st.image(teeth["image"], caption="المجموعة المختارة", use_container_width=True)
-            
-            st.markdown("#### خيارات التعديل")
-            rotation = st.slider("تدوير", -180, 180, 0)
-            scale = st.slider("تكبير/تصغير", 0.5, 2.0, 1.0, 0.1)
-            if st.button("تطبيق التعديلات", use_container_width=True):
-                img = teeth["image"]
-                if rotation != 0:
-                    img = img.rotate(rotation, expand=True)
-                if scale != 1.0:
-                    w, h = img.size
-                    img = img.resize((int(w*scale), int(h*scale)))
-                if st.session_state.image_layers:
-                    st.session_state.image_layers[st.session_state.current_layer]["image"] = img
-                    st.success("تم تطبيق التعديلات")
-                    st.rerun()
-        
-        st.markdown("---")
-        st.markdown("### 🎯 محاكاة واقعية بالذكاء الاصطناعي")
-        if st.button("🎯 توليد محاكاة واقعية", type="primary", use_container_width=True):
-            img = get_current_layer_image()
-            if img:
-                with st.spinner("جاري توليد المحاكاة الواقعية..."):
-                    _, result = simulate_smile_before_after(img, 0.8)
-                    add_layer(result, "Simulation")
-                    st.success("تم توليد المحاكاة الواقعية!")
-                    st.rerun()
-    
-    with col1:
-        st.markdown("### 📐 مساحة التحرير")
-        if st.session_state.image_layers:
-            display_img = None
-            for layer in st.session_state.image_layers:
-                if layer["visible"] and layer["image"]:
-                    img = layer["image"].copy()
-                    if display_img is None:
-                        display_img = img
-                    else:
-                        try:
-                            display_img = Image.blend(display_img, img, layer["opacity"])
-                        except:
-                            display_img = img
-            if display_img:
-                display_img.thumbnail((700, 500))
-                st.image(display_img, caption="المحرر", use_container_width=True)
-        
-        st.markdown("### 📋 الطبقات")
-        for i, layer in enumerate(st.session_state.image_layers):
-            col_a, col_b, col_c = st.columns([1, 3, 1])
-            with col_a:
-                vis = "👁️" if layer["visible"] else "👁️‍🗨️"
-                if st.button(vis, key=f"vis_{i}"):
-                    layer["visible"] = not layer["visible"]
-                    st.rerun()
-            with col_b:
-                if st.button(f"{layer['name']}", key=f"layer_{i}", use_container_width=True):
-                    st.session_state.current_layer = i
-                    st.rerun()
-            with col_c:
-                if st.button("✕", key=f"del_{i}"):
-                    if 0 <= i < len(st.session_state.image_layers):
-                        st.session_state.image_layers.pop(i)
-                        if st.session_state.current_layer >= len(st.session_state.image_layers):
-                            st.session_state.current_layer = len(st.session_state.image_layers) - 1
-                        st.rerun()
-        
-        col_merge, col_clear = st.columns(2)
-        with col_merge:
-            if st.button("🔗 دمج الكل", use_container_width=True):
-                merge_layers()
-                st.rerun()
-        with col_clear:
-            if st.button("🗑️ مسح الكل", use_container_width=True):
-                st.session_state.image_layers = []
-                st.rerun()
-
-# =============================================================
-# OTHER PAGES (مختصرة)
-# =============================================================
-def page_home():
-    st.markdown("""
-    <div style="text-align:center; padding:30px 0;">
-        <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-            <span class="badge-gold">AI-Powered · 3D Planning</span>
-        </div>
-        <h1 style="font-size:2.4rem; font-weight:800;">تشخيص دقيق <span style="color:#e67e22;">بذكاء اصطناعي</span></h1>
-        <p style="color:#94a3b8; font-size:1.1rem; max-width:600px; margin:12px auto;">
-            منصة متكاملة لطب الأسنان التجميلي مع محاكاة الواقع الافتراضي والذكاء الاصطناعي.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-def page_dashboard():
-    st.markdown('<h2>📊 لوحة التحكم</h2>', unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#94a3b8;'>مرحباً بك، <strong>{st.session_state.current_user['name']}</strong></p>", unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.metric("👨‍⚕️ المرضى", len(st.session_state.patients))
-    with c2:
-        st.metric("📅 المواعيد", len(st.session_state.appointments))
-    with c3:
-        st.metric("🧠 الصور المُنتجة", len(st.session_state.generated_images))
-    with c4:
-        st.metric("👥 الأصدقاء", len(st.session_state.current_user.get("friends", [])))
-
-def page_patients():
-    st.markdown('<h2>👨‍⚕️ قائمة المرضى</h2>', unsafe_allow_html=True)
-    if st.button("➕ مريض جديد", type="primary"):
-        st.session_state.current_page = "new_patient"
-        st.rerun()
-    if st.session_state.patients:
-        df = pd.DataFrame(st.session_state.patients)
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("لا يوجد مرضى")
-
-def page_new_patient():
-    st.markdown('<h2>📝 إضافة مريض جديد</h2>', unsafe_allow_html=True)
-    with st.form("new_patient_form"):
-        name = st.text_input("الاسم الكامل *")
-        age = st.number_input("العمر", min_value=0, max_value=120, value=30)
-        phone = st.text_input("رقم الهاتف")
-        gender = st.selectbox("الجنس", ["ذكر", "أنثى", "غير محدد"])
-        complaint = st.text_area("الشكوى الرئيسية")
-        if st.form_submit_button("💾 حفظ المريض", use_container_width=True) and name:
-            st.session_state.patients.append({
-                "id": f"P{len(st.session_state.patients)+1:04d}",
-                "name": name,
-                "age": age,
-                "phone": phone,
-                "gender": gender,
-                "complaint": complaint,
-                "created_at": datetime.now().isoformat()
-            })
-            st.success("تم إضافة المريض!")
-            st.rerun()
-
 def page_photography(): st.markdown('<h2>📸 قسم التصوير</h2>', unsafe_allow_html=True)
 def page_xray(): st.markdown('<h2>🩻 قسم الأشعة</h2>', unsafe_allow_html=True)
 def page_smile_design(): 
@@ -1509,7 +1876,9 @@ def page_mock_db(): st.markdown('<h2>🗄️ مستودع المريض</h2>', un
 def page_notifications(): st.markdown('<h2>🔔 الإشعارات</h2>', unsafe_allow_html=True)
 def page_systems(): st.markdown('<h2>🖥️ الأنظمة</h2>', unsafe_allow_html=True)
 def page_scientific_scan(): st.markdown('<h2>🔬 المسح العلمي</h2>', unsafe_allow_html=True)
-def page_naqai(): st.markdown('<h2>🤖 NaqAI</h2>', unsafe_allow_html=True)
+def page_naqai(): 
+    st.markdown('<h2>🤖 NaqAI</h2>', unsafe_allow_html=True)
+    st.info("مساعد ذكي - قيد التطوير")
 def page_interdisciplinary(): st.markdown('<h2>👥 فرق متعددة التخصصات</h2>', unsafe_allow_html=True)
 def page_ads(): st.markdown('<h2>📢 الإعلانات</h2>', unsafe_allow_html=True)
 def page_lab(): st.markdown('<h2>🔬 المعمل</h2>', unsafe_allow_html=True)
@@ -1641,7 +2010,7 @@ def auth_page():
                             st.error(msg)
 
 # =============================================================
-# SIDEBAR
+# SIDEBAR NAVIGATION
 # =============================================================
 def sidebar_nav():
     user = st.session_state.current_user
