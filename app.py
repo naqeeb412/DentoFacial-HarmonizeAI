@@ -18,13 +18,17 @@ import string
 import re
 import time
 import requests
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+import subprocess
+import sys
+import platform
+
+# =============================================================
+# SYSTEM DETECTION - اكتشاف نظام التشغيل
+# =============================================================
+IS_WINDOWS = platform.system() == "Windows"
+IS_LINUX = platform.system() == "Linux"
+IS_MAC = platform.system() == "Darwin"
+IS_MOBILE = st.runtime.scriptrunner.script_runner.RUNTIME == "mobile" if hasattr(st, 'runtime') else False
 
 # =============================================================
 # CONFIG & PAGE SETUP
@@ -37,11 +41,16 @@ st.set_page_config(
 )
 
 # =============================================================
-# CSS - RTL & Dark Theme + Enhanced Styles
+# CSS - RTL & Dark Theme + Enhanced Styles (متوافق مع جميع الأجهزة)
 # =============================================================
 CUSTOM_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
 
 html, body, [class*="css"] {
     font-family: 'Cairo', sans-serif;
@@ -57,6 +66,8 @@ html, body, [class*="css"] {
     border-radius: 60px !important;
     font-weight: 600 !important;
     font-family: 'Cairo', sans-serif !important;
+    touch-action: manipulation !important;
+    -webkit-touch-callout: none !important;
 }
 .metric-card {
     background: #1e293b;
@@ -123,6 +134,7 @@ html, body, [class*="css"] {
     cursor: pointer;
     transition: 0.3s;
     text-align: center;
+    touch-action: manipulation;
 }
 .social-login-btn:hover {
     background: rgba(230,126,34,0.1);
@@ -140,6 +152,7 @@ html, body, [class*="css"] {
 .dental-chart-wrapper {
     overflow-x: auto;
     padding: 10px 0;
+    -webkit-overflow-scrolling: touch;
 }
 .dental-chart {
     display: flex;
@@ -180,6 +193,7 @@ html, body, [class*="css"] {
     color: #1a2a3a;
     position: relative;
     user-select: none;
+    touch-action: manipulation;
 }
 .tooth:hover {
     transform: translateY(-3px);
@@ -465,6 +479,41 @@ html, body, [class*="css"] {
 .teeth-card .status-treated { background: #3b82f620; color: #3b82f6; }
 .teeth-card .status-crown { background: #8b5cf620; color: #8b5cf6; }
 .teeth-card .status-root-canal { background: #ec489920; color: #ec4899; }
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .tooth {
+        width: 36px !important;
+        height: 44px !important;
+        font-size: 9px !important;
+    }
+    .dental-chart {
+        min-width: 550px !important;
+    }
+    .metric-value {
+        font-size: 1.5rem !important;
+    }
+    .card {
+        padding: 16px !important;
+    }
+    .stButton>button {
+        font-size: 14px !important;
+        padding: 8px 16px !important;
+    }
+}
+@media (max-width: 480px) {
+    .tooth {
+        width: 30px !important;
+        height: 38px !important;
+        font-size: 8px !important;
+    }
+    .dental-chart {
+        min-width: 450px !important;
+    }
+    .tooth .num {
+        font-size: 7px !important;
+    }
+}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -711,6 +760,50 @@ def logout():
     st.session_state.current_user = None
     st.session_state.current_page = "home"
     st.rerun()
+
+# =============================================================
+# CHECK DEPENDENCIES - التحقق من التبعيات حسب النظام
+# =============================================================
+def check_opencv():
+    """التحقق من توفر OpenCV"""
+    try:
+        import cv2
+        return True
+    except ImportError:
+        return False
+
+def check_mediapipe():
+    """التحقق من توفر MediaPipe"""
+    try:
+        import mediapipe as mp
+        return True
+    except ImportError:
+        return False
+
+def install_package(package):
+    """تثبيت حزمة بايثون"""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        return True
+    except:
+        return False
+
+# التحقق من التبعيات
+if not check_opencv():
+    st.warning("⚠️ OpenCV غير مثبت. سيتم محاولة التثبيت...")
+    if install_package("opencv-python"):
+        st.success("✅ تم تثبيت OpenCV بنجاح!")
+        st.rerun()
+    else:
+        st.error("❌ فشل تثبيت OpenCV. بعض الميزات لن تعمل.")
+
+if not check_mediapipe():
+    st.warning("⚠️ MediaPipe غير مثبت. سيتم محاولة التثبيت...")
+    if install_package("mediapipe"):
+        st.success("✅ تم تثبيت MediaPipe بنجاح!")
+        st.rerun()
+    else:
+        st.error("❌ فشل تثبيت MediaPipe. بعض الميزات لن تعمل.")
 
 # =============================================================
 # IMAGE PROCESSING FUNCTIONS
@@ -1106,105 +1199,138 @@ def real_cephalometric_analysis(image):
     return analysis_data
 
 # =============================================================
-# PDF REPORT GENERATION
+# PDF REPORT GENERATION (باستخدام HTML مع دعم PDF اختياري)
 # =============================================================
 
-def generate_pdf_report(patient_name, analysis_results, images):
+def generate_html_report(patient_name, analysis_results, images):
     """
-    توليد تقرير PDF مع الصور والتحاليل
+    توليد تقرير HTML مع الصور والتحاليل
     """
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
-    styles = getSampleStyleSheet()
-    story = []
+    html = f"""
+    <!DOCTYPE html>
+    <html dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>تقرير HarmonizeAI™</title>
+        <style>
+            body {{ font-family: 'Cairo', sans-serif; background: #f5f5f5; padding: 20px; }}
+            .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+            h1 {{ color: #e67e22; text-align: center; }}
+            .info {{ text-align: right; margin-bottom: 20px; }}
+            .info-item {{ margin: 5px 0; }}
+            .image-section {{ margin: 20px 0; text-align: center; }}
+            .image-section img {{ max-width: 100%; border: 1px solid #ddd; border-radius: 5px; margin: 10px 0; }}
+            .results-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            .results-table th, .results-table td {{ border: 1px solid #ddd; padding: 8px; text-align: center; }}
+            .results-table th {{ background: #e67e22; color: white; }}
+            .footer {{ text-align: center; margin-top: 30px; color: #999; font-size: 12px; }}
+            @media (max-width: 600px) {{
+                .container {{ padding: 15px; }}
+                .results-table th, .results-table td {{ padding: 4px; font-size: 12px; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🦷 تقرير HarmonizeAI™</h1>
+            <div class="info">
+                <div class="info-item"><strong>اسم المريض:</strong> {patient_name}</div>
+                <div class="info-item"><strong>تاريخ التقرير:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
+            </div>
+    """
     
-    title_style = ParagraphStyle(
-        'CustomTitle',
-        parent=styles['Heading1'],
-        fontSize=24,
-        textColor=colors.HexColor('#e67e22'),
-        alignment=TA_CENTER,
-        spaceAfter=30
-    )
-    story.append(Paragraph("تقرير HarmonizeAI™", title_style))
-    story.append(Spacer(1, 12))
-    
-    info_style = ParagraphStyle(
-        'InfoStyle',
-        parent=styles['Normal'],
-        fontSize=12,
-        alignment=TA_RIGHT,
-        spaceAfter=6
-    )
-    story.append(Paragraph(f"<b>اسم المريض:</b> {patient_name}", info_style))
-    story.append(Paragraph(f"<b>تاريخ التقرير:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", info_style))
-    story.append(Spacer(1, 20))
-    
-    for i, (title, img_data) in enumerate(images.items()):
+    # إضافة الصور
+    for title, img_data in images.items():
         if img_data and isinstance(img_data, Image.Image):
-            img_buffer = BytesIO()
-            img_data.save(img_buffer, format='PNG')
-            img_buffer.seek(0)
-            
-            story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
-            story.append(Spacer(1, 10))
-            
-            img = RLImage(img_buffer, width=400, height=300)
-            story.append(img)
-            story.append(Spacer(1, 20))
+            buffered = BytesIO()
+            img_data.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            html += f"""
+            <div class="image-section">
+                <h3>{title}</h3>
+                <img src="data:image/png;base64,{img_str}" alt="{title}">
+            </div>
+            """
     
-    story.append(Paragraph("<b>نتائج التحليل:</b>", styles['Heading3']))
-    story.append(Spacer(1, 10))
+    # إضافة نتائج التحليل
+    html += "<h2>📊 نتائج التحليل</h2>"
     
     if "face_analysis" in analysis_results:
         face_data = analysis_results["face_analysis"]
-        table_data = [
-            ["المقياس", "القيمة"],
-            ["درجة التناسق", f"{face_data.get('symmetry_score', 0):.1f}%"],
-            ["مؤشر الابتسامة", f"{face_data.get('smile_index', 0):.1f}%"],
-            ["شكل الوجه", face_data.get('face_shape', 'غير محدد')],
-            ["المسافة بين العينين", f"{face_data.get('eye_distance', 0):.1f} px"],
-            ["عرض الفم", f"{face_data.get('mouth_width', 0):.1f} px"],
-        ]
-        table = Table(table_data, colWidths=[200, 200])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(table)
-        story.append(Spacer(1, 20))
+        html += """
+        <h3>تحليل الوجه</h3>
+        <table class="results-table">
+            <tr><th>المقياس</th><th>القيمة</th></tr>
+            <tr><td>درجة التناسق</td><td>{:.1f}%</td></tr>
+            <tr><td>مؤشر الابتسامة</td><td>{:.1f}%</td></tr>
+            <tr><td>شكل الوجه</td><td>{}</td></tr>
+            <tr><td>المسافة بين العينين</td><td>{:.1f} px</td></tr>
+            <tr><td>عرض الفم</td><td>{:.1f} px</td></tr>
+        </table>
+        """.format(
+            face_data.get('symmetry_score', 0),
+            face_data.get('smile_index', 0),
+            face_data.get('face_shape', 'غير محدد'),
+            face_data.get('eye_distance', 0),
+            face_data.get('mouth_width', 0)
+        )
     
     if "cephalometric" in analysis_results:
         ceph_data = analysis_results["cephalometric"]
-        story.append(Paragraph("<b>التحليل السيفالومتري:</b>", styles['Heading4']))
-        ceph_table_data = [
-            ["الزاوية", "القيمة", "التقييم"],
-            ["SNA", f"{ceph_data.get('SNA', 0):.1f}°", "طبيعي"],
-            ["SNB", f"{ceph_data.get('SNB', 0):.1f}°", "طبيعي"],
-            ["ANB", f"{ceph_data.get('ANB', 0):.1f}°", "طبيعي"],
-            ["SN-MP", f"{ceph_data.get('SN-MP', 0):.1f}°", "طبيعي"],
-            ["FMA", f"{ceph_data.get('FMA', 0):.1f}°", "طبيعي"],
-        ]
-        ceph_table = Table(ceph_table_data, colWidths=[150, 150, 150])
-        ceph_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(ceph_table)
+        html += """
+        <h3>التحليل السيفالومتري</h3>
+        <table class="results-table">
+            <tr><th>الزاوية</th><th>القيمة</th><th>التقييم</th></tr>
+            <tr><td>SNA</td><td>{:.1f}°</td><td>طبيعي</td></tr>
+            <tr><td>SNB</td><td>{:.1f}°</td><td>طبيعي</td></tr>
+            <tr><td>ANB</td><td>{:.1f}°</td><td>طبيعي</td></tr>
+            <tr><td>SN-MP</td><td>{:.1f}°</td><td>طبيعي</td></tr>
+            <tr><td>FMA</td><td>{:.1f}°</td><td>طبيعي</td></tr>
+        </table>
+        """.format(
+            ceph_data.get('SNA', 0),
+            ceph_data.get('SNB', 0),
+            ceph_data.get('ANB', 0),
+            ceph_data.get('SN-MP', 0),
+            ceph_data.get('FMA', 0)
+        )
     
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
+    html += """
+            <div class="footer">
+                <strong>Dentofacial HarmonizeAI™</strong><br>
+                Naqeeb412 · Synergy<br>
+                © 2026 جميع الحقوق محفوظة.
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html
+
+def generate_pdf_from_html(html_content):
+    """
+    محاولة تحويل HTML إلى PDF باستخدام المكتبات المتاحة
+    """
+    try:
+        # محاولة استخدام weasyprint
+        from weasyprint import HTML
+        pdf_buffer = BytesIO()
+        HTML(string=html_content).write_pdf(pdf_buffer)
+        pdf_buffer.seek(0)
+        return pdf_buffer
+    except ImportError:
+        try:
+            # محاولة استخدام pdfkit (wkhtmltopdf)
+            import pdfkit
+            pdf_buffer = BytesIO()
+            pdfkit.from_string(html_content, pdf_buffer)
+            pdf_buffer.seek(0)
+            return pdf_buffer
+        except:
+            # إذا لم تتوفر أي مكتبة، نرسل None
+            return None
 
 # =============================================================
 # AUTH PAGE
@@ -3181,10 +3307,12 @@ def page_pdf_report():
     
     if images:
         st.markdown("### 📸 الصور المتاحة للتقرير")
-        cols = st.columns(len(images))
-        for i, (title, img) in enumerate(images.items()):
+        cols = st.columns(min(len(images), 3))
+        for i, (title, img) in enumerate(list(images.items())[:3]):
             with cols[i]:
                 st.image(img, caption=title, use_container_width=True)
+        if len(images) > 3:
+            st.info(f"📸 +{len(images) - 3} صور إضافية")
     else:
         st.info("💡 قم بتحليل الوجه أو الأشعة أو محاكاة الابتسامة أولاً لتوليد الصور")
     
@@ -3194,17 +3322,29 @@ def page_pdf_report():
     if hasattr(st.session_state, 'last_cephalometric_data') and st.session_state.last_cephalometric_data:
         analysis_data["cephalometric"] = st.session_state.last_cephalometric_data
     
-    if st.button("📄 توليد تقرير PDF", type="primary", use_container_width=True):
+    if st.button("📄 توليد تقرير", type="primary", use_container_width=True):
         if images:
             with st.spinner("⏳ جاري توليد التقرير..."):
-                pdf_buffer = generate_pdf_report(patient_name, analysis_data, images)
+                html_content = generate_html_report(patient_name, analysis_data, images)
                 
-                st.download_button(
-                    label="⬇️ تحميل التقرير PDF",
-                    data=pdf_buffer.getvalue(),
-                    file_name=f"report_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                    mime="application/pdf"
-                )
+                pdf_buffer = generate_pdf_from_html(html_content)
+                
+                if pdf_buffer:
+                    st.download_button(
+                        label="⬇️ تحميل التقرير PDF",
+                        data=pdf_buffer.getvalue(),
+                        file_name=f"report_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf"
+                    )
+                else:
+                    st.download_button(
+                        label="⬇️ تحميل التقرير HTML",
+                        data=html_content.encode('utf-8'),
+                        file_name=f"report_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                        mime="text/html"
+                    )
+                    st.info("💡 تم توليد التقرير بصيغة HTML (لأن مكتبة PDF غير متوفرة)")
+                
                 st.success("✅ تم توليد التقرير بنجاح!")
         else:
             st.warning("⚠️ لا توجد صور للتصدير. قم بتحليل الوجه أو الأشعة أولاً.")
@@ -3213,7 +3353,7 @@ def page_three_d_viewer():
     """صفحة عارض ثلاثي الأبعاد مع دعم 3dpea.com"""
     st.markdown('<h2>🦷 عارض الأسنان ثلاثي الأبعاد <span style="color:#e67e22;">3D Viewer</span></h2>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["🦷 عارض Three.js", "🌐 3DPEA.com - عارض مجاني"])
+    tab1, tab2 = st.tabs(["🦷 عارض Three.js", "🌐 3DPEA.com"])
     
     with tab1:
         st.markdown("### 🎮 عارض Three.js المدمج")
