@@ -429,6 +429,34 @@ html, body, [class*="css"] {
     padding: 16px;
     border: 1px solid #334155;
 }
+
+/* Natural Teeth Card Styles */
+.teeth-card {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #334155;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+.teeth-card:hover {
+    border-color: #e67e22;
+    transform: translateY(-2px);
+}
+.teeth-card .tooth-status {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.teeth-card .status-normal { background: #10b98120; color: #10b981; }
+.teeth-card .status-missing { background: #ef444420; color: #ef4444; }
+.teeth-card .status-carious { background: #f59e0b20; color: #f59e0b; }
+.teeth-card .status-treated { background: #3b82f620; color: #3b82f6; }
+.teeth-card .status-crown { background: #8b5cf620; color: #8b5cf6; }
+.teeth-card .status-root-canal { background: #ec489920; color: #ec4899; }
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -451,7 +479,7 @@ def display_system_logo(width=50):
     return '<div style="background:#e67e22; width:'+str(width)+'px; height:'+str(width)+'px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; color:#0a0a0a;">🦷</div>'
 
 # =============================================================
-# AUTHENTICATION SYSTEM - Multi-Platform Login
+# AUTHENTICATION SYSTEM - Multi-Platform Login (مصحح)
 # =============================================================
 OWNER_EMAIL = "ndcdental2025@outlook.com"
 OWNER_PASSWORD_HASH = hashlib.sha256("ndc2025".encode()).hexdigest()
@@ -489,6 +517,8 @@ if "current_user" not in st.session_state:
     st.session_state.current_user = None
 if "otp_store" not in st.session_state:
     st.session_state.otp_store = {}
+if "pending_social_auth" not in st.session_state:
+    st.session_state.pending_social_auth = {}
 
 # =============================================================
 # DATA STORE - جميع بيانات النظام
@@ -531,6 +561,8 @@ if "naqai_chat" not in st.session_state:
     st.session_state.naqai_chat = [{"role": "ai", "text": "👋 مرحباً! أنا NaqAI، مساعدك الذكي. اسألني عن أي شيء متعلق بطب الأسنان التجميلي والوجه."}]
 if "dental_chart" not in st.session_state:
     st.session_state.dental_chart = ['normal'] * 32
+if "tooth_statuses" not in st.session_state:
+    st.session_state.tooth_statuses = {i: "normal" for i in range(32)}
 if "patient_images" not in st.session_state:
     st.session_state.patient_images = []
 if "xray_images" not in st.session_state:
@@ -571,9 +603,11 @@ if "smile_designs" not in st.session_state:
     st.session_state.smile_designs = []
 if "facial_analysis_results" not in st.session_state:
     st.session_state.facial_analysis_results = []
+if "selected_tooth" not in st.session_state:
+    st.session_state.selected_tooth = None
 
 # =============================================================
-# AUTH FUNCTIONS
+# AUTH FUNCTIONS (مصححة للدعم المتعدد)
 # =============================================================
 def login_user(email, password):
     db = st.session_state.users_db
@@ -584,8 +618,11 @@ def login_user(email, password):
             return True
     return False
 
-def login_with_platform(email, platform):
+def login_with_platform(email, platform, user_data=None):
+    """تسجيل الدخول باستخدام منصة خارجية"""
     db = st.session_state.users_db
+    
+    # إذا كان المستخدم موجوداً بالفعل
     if email in db:
         if "platforms" not in db[email]:
             db[email]["platforms"] = []
@@ -593,8 +630,32 @@ def login_with_platform(email, platform):
             db[email]["platforms"].append(platform)
         st.session_state.authenticated = True
         st.session_state.current_user = db[email]
-        return True
-    return False
+        return True, "تم تسجيل الدخول بنجاح"
+    
+    # إذا كان المستخدم غير موجود، نقوم بإنشاء حساب جديد
+    if user_data:
+        name = user_data.get("name", f"مستخدم {platform}")
+        db[email] = {
+            "name": name,
+            "email": email,
+            "password": "",
+            "role": "doctor",
+            "specialty": user_data.get("specialty", ""),
+            "phone": user_data.get("phone", ""),
+            "country": user_data.get("country", ""),
+            "bio": user_data.get("bio", ""),
+            "avatar": user_data.get("avatar", ""),
+            "cover_photo": "",
+            "friends": [],
+            "pending_requests": [],
+            "platforms": [platform],
+            "created_at": datetime.now().isoformat()
+        }
+        st.session_state.authenticated = True
+        st.session_state.current_user = db[email]
+        return True, f"تم إنشاء حساب جديد عبر {platform}"
+    
+    return False, "فشل تسجيل الدخول"
 
 def signup_user(name, email, password, role="doctor", phone="", specialty="", platform="email"):
     if email in st.session_state.users_db:
@@ -742,11 +803,13 @@ def draw_face_mesh_on_image(image):
     return Image.fromarray(img_np)
 
 def generate_natural_teeth(count=10, color='#F5F0E8'):
-    """توليد أسنان طبيعية"""
+    """توليد أسنان طبيعية محسنة"""
     img = Image.new('RGB', (600, 350), color='#1a1a2e')
     draw = ImageDraw.Draw(img)
     
-    colors = ['#F5F0E8', '#E8E0D8', '#F0EBE3', '#E5DDD5']
+    # ألوان طبيعية للأسنان
+    colors = ['#F5F0E8', '#E8E0D8', '#F0EBE3', '#E5DDD5', '#F2EDE5', '#EAE2DA']
+    
     for i in range(count):
         x = 40 + i * 50
         y = 100
@@ -754,10 +817,15 @@ def generate_natural_teeth(count=10, color='#F5F0E8'):
         h = 65
         tooth_color = random.choice(colors)
         
+        # رسم السن مع تأثير ثلاثي الأبعاد
         draw.ellipse([x, y, x+w, y+h], fill=tooth_color, outline='#cbd5e1', width=2)
-        draw.ellipse([x+6, y+8, x+w-6, y+h-10], fill='#FFFFFF', outline=None)
-        draw.ellipse([x+10, y+12, x+w-10, y+h-15], fill=tooth_color, outline=None)
+        draw.ellipse([x+4, y+6, x+w-4, y+h-8], fill='#FFFFFF', outline=None)
+        draw.ellipse([x+8, y+10, x+w-8, y+h-12], fill=tooth_color, outline=None)
+        
+        # إضافة تفاصيل السن
+        draw.arc([x+6, y+12, x+w-6, y+h-8], 0, 180, fill='#cbd5e1', width=1)
     
+    # اللثة العلوية
     draw.rectangle([0, 80, 600, 105], fill='#e8b4b8')
     draw.rectangle([0, 170, 600, 190], fill='#e8b4b8')
     
@@ -843,15 +911,25 @@ def apply_filter_to_layer(image, filter_type):
         return image.convert('L').convert('RGB')
     return image
 
+def update_tooth_status(index, status):
+    """تحديث حالة سن معين"""
+    if 0 <= index < 32:
+        st.session_state.tooth_statuses[index] = status
+        st.session_state.dental_chart[index] = status
+        return True
+    return False
+
+def get_tooth_status(index):
+    """الحصول على حالة سن"""
+    return st.session_state.tooth_statuses.get(index, "normal")
+
 # =============================================================
-# 3D VIEWER FUNCTIONS (دمج موقع 3dpea.com)
+# 3D VIEWER FUNCTIONS
 # =============================================================
 def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
-    """توليد HTML لعارض 3D باستخدام Three.js مشابه لـ 3dpea.com"""
+    """توليد HTML لعارض 3D باستخدام Three.js"""
     
-    # إذا لم يتم توفير رابط نموذج، نستخدم نموذج افتراضي لأسنان
     if model_url is None:
-        # نموذج أسنان افتراضي بتنسيق JSON (يمكن استبداله برابط STL حقيقي)
         model_url = "https://threejs.org/examples/models/obj/Face.obj"
     
     html = f'''
@@ -889,21 +967,15 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
         <script type="module">
             import * as THREE from 'three';
             import {{ OrbitControls }} from 'three/addons/controls/OrbitControls.js';
-            import {{ STLLoader }} from 'three/addons/loaders/STLLoader.js';
-            import {{ OBJLoader }} from 'three/addons/loaders/OBJLoader.js';
-            import {{ PLYLoader }} from 'three/addons/loaders/PLYLoader.js';
             
-            // إعداد المشهد
             const container = document.getElementById('container');
             const scene = new THREE.Scene();
             scene.background = new THREE.Color(0x0f172a);
             
-            // الكاميرا
             const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(5, 3, 8);
             camera.lookAt(0, 0, 0);
             
-            // الريندرر
             const renderer = new THREE.WebGLRenderer({{ antialias: true }});
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -911,7 +983,6 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             container.appendChild(renderer.domElement);
             
-            // التحكمات
             const controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
@@ -920,7 +991,6 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
             controls.minDistance = 2;
             controls.maxDistance = 20;
             
-            // الإضاءة
             const ambientLight = new THREE.AmbientLight(0x404060);
             scene.add(ambientLight);
             
@@ -933,30 +1003,16 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
             fillLight.position.set(-5, 0, 5);
             scene.add(fillLight);
             
-            const backLight = new THREE.DirectionalLight(0xff8888, 0.3);
-            backLight.position.set(0, -5, -5);
-            scene.add(backLight);
-            
-            // إضافة شبكة أرضية
             const gridHelper = new THREE.GridHelper(10, 10, 0x334155, 0x1e293b);
             gridHelper.position.y = -1.5;
             scene.add(gridHelper);
             
-            // مؤشر المحاور
-            const axesHelper = new THREE.AxesHelper(2);
-            axesHelper.position.y = -1.5;
-            scene.add(axesHelper);
-            
-            // كائن النموذج الرئيسي
             let mainModel = null;
-            let wireframeModel = null;
             let isWireframe = false;
             
-            // إنشاء نموذج أسنان افتراضي باستخدام الأشكال الهندسية
             function createDefaultTeeth() {{
                 const group = new THREE.Group();
                 
-                // مواد الأسنان
                 const toothMaterial = new THREE.MeshPhysicalMaterial({{
                     color: 0xf5f0e8,
                     metalness: 0.05,
@@ -971,7 +1027,6 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
                     roughness: 0.8,
                 }});
                 
-                // إنشاء أسنان علوية
                 for (let i = -7; i <= 7; i++) {{
                     if (i === 0) continue;
                     const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8), toothMaterial);
@@ -983,7 +1038,6 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
                     group.add(tooth);
                 }}
                 
-                // إنشاء أسنان سفلية
                 for (let i = -7; i <= 7; i++) {{
                     if (i === 0) continue;
                     const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), toothMaterial);
@@ -995,13 +1049,11 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
                     group.add(tooth);
                 }}
                 
-                // اللثة العلوية
                 const gumUpper = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), gumMaterial);
                 gumUpper.position.set(0, 0, -0.5);
                 gumUpper.scale.set(1, 0.3, 0.8);
                 group.add(gumUpper);
                 
-                // اللثة السفلية
                 const gumLower = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, Math.PI/2, Math.PI/2), gumMaterial);
                 gumLower.position.set(0, -0.05, 0.5);
                 gumLower.scale.set(1, 0.3, 0.8);
@@ -1010,16 +1062,10 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
                 return group;
             }}
             
-            function loadModel() {{
-                // استخدام نموذج افتراضي بدلاً من تحميل ملف
-                const model = createDefaultTeeth();
-                scene.add(model);
-                mainModel = model;
-            }}
+            const model = createDefaultTeeth();
+            scene.add(model);
+            mainModel = model;
             
-            loadModel();
-            
-            // وظائف التحكم
             window.resetCamera = function() {{
                 camera.position.set(5, 3, 8);
                 controls.target.set(0, 0, 0);
@@ -1039,23 +1085,18 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
                 controls.autoRotate = !controls.autoRotate;
             }};
             
-            // معالجة تغيير حجم النافذة
             window.addEventListener('resize', () => {{
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             }});
             
-            // حلقة التصيير
             function animate() {{
                 requestAnimationFrame(animate);
                 controls.update();
                 renderer.render(scene, camera);
             }}
             animate();
-            
-            // دعم التحميل من رابط
-            console.log('🦷 3D Viewer initialized with default teeth model');
         </script>
     </body>
     </html>
@@ -1063,14 +1104,10 @@ def get_3d_viewer_html(model_url=None, autoplay=True, controls=True):
     return html
 
 def page_3d_viewer():
-    """صفحة عارض 3D مشابه لـ 3dpea.com"""
+    """صفحة عارض 3D"""
     st.markdown('<h2>🦷 عارض الأسنان ثلاثي الأبعاد <span style="color:#e67e22;">3D Viewer</span></h2>', unsafe_allow_html=True)
     st.caption("عارض 3D تفاعلي للأسنان والوجه - اسحب للتدوير، مرر للتكبير")
     
-    # عرض عارض 3D
-    st.markdown("### 🎮 عارض 3D تفاعلي")
-    
-    # خيارات العرض
     col1, col2, col3 = st.columns(3)
     with col1:
         model_type = st.selectbox(
@@ -1082,20 +1119,16 @@ def page_3d_viewer():
     with col3:
         show_grid = st.checkbox("📐 شبكة مرجعية", value=True)
     
-    # زر تحميل ملف
     uploaded_model = st.file_uploader(
         "📤 تحميل نموذج 3D (STL, OBJ, PLY)",
         type=["stl", "obj", "ply", "glb", "gltf"],
         key="model_upload_3d"
     )
     
-    # عرض العارض
     viewer_html = get_3d_viewer_html()
     st.components.v1.html(viewer_html, height=550)
     
-    # أدوات تحكم إضافية
     st.markdown("### 🛠️ أدوات التحكم")
-    
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
         if st.button("🔄 إعادة ضبط", use_container_width=True):
@@ -1113,7 +1146,6 @@ def page_3d_viewer():
         if st.button("💾 حفظ", use_container_width=True):
             st.success("✅ تم حفظ النموذج!")
     
-    # معلومات النموذج
     st.markdown("### 📋 معلومات النموذج")
     col_info1, col_info2, col_info3, col_info4 = st.columns(4)
     with col_info1:
@@ -1126,7 +1158,7 @@ def page_3d_viewer():
         st.metric("📁 الحجم", "4.2 MB", "STL")
 
 # =============================================================
-# LOGIN / SIGNUP PAGE
+# LOGIN / SIGNUP PAGE (مصححة)
 # =============================================================
 def auth_page():
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -1147,29 +1179,45 @@ def auth_page():
 
         st.markdown("### 🔐 طرق تسجيل الدخول")
         
-        # Social Login Buttons
-        col_social = st.columns(6)
+        # Social Login Buttons (مصححة)
+        st.markdown("#### 🌐 تسجيل الدخول عبر المنصات")
+        
         social_platforms = [
-            ("Google", "🔵", "google"),
-            ("Facebook", "🔷", "facebook"),
-            ("Instagram", "🟣", "instagram"),
-            ("LinkedIn", "🔵", "linkedin"),
-            ("Twitter", "🔷", "twitter"),
-            ("WhatsApp", "🟢", "whatsapp")
+            ("Google", "🔵", "google", "#ea4335", "أبيض"),
+            ("Facebook", "🔷", "facebook", "#1877f2", "أبيض"),
+            ("Instagram", "🟣", "instagram", "#e4405f", "أبيض"),
+            ("LinkedIn", "🔵", "linkedin", "#0a66c2", "أبيض"),
+            ("Twitter", "🔷", "twitter", "#1da1f2", "أبيض"),
+            ("WhatsApp", "🟢", "whatsapp", "#25d366", "أبيض")
         ]
-        for i, (name, icon, key) in enumerate(social_platforms):
-            with col_social[i]:
-                if st.button(f"{icon}\n{name}", key=f"social_{key}", use_container_width=True):
-                    platform_email = f"user_{random.randint(1000,9999)}@{key}.com"
-                    if platform_email not in st.session_state.users_db:
-                        signup_user(f"مستخدم {key}", platform_email, "", "doctor", "", f"طبيب {key}", key)
-                    if login_with_platform(platform_email, key):
-                        st.success(f"✅ تم تسجيل الدخول عبر {name}!")
+        
+        # عرض الأزرار في صفين
+        cols1 = st.columns(3)
+        cols2 = st.columns(3)
+        
+        for i, (name, icon, key, color, text_color) in enumerate(social_platforms):
+            col = cols1[i % 3] if i < 3 else cols2[i % 3]
+            with col:
+                if st.button(f"{icon} {name}", key=f"social_{key}", use_container_width=True):
+                    # إنشاء بريد إلكتروني وهمي للمنصة
+                    platform_email = f"user_{random.randint(1000,9999)}_{key}@social.com"
+                    user_data = {
+                        "name": f"مستخدم {name}",
+                        "specialty": f"طبيب {name}",
+                        "phone": f"+000 {random.randint(100,999)} {random.randint(100,999)}",
+                        "country": "اليمن"
+                    }
+                    
+                    success, msg = login_with_platform(platform_email, key, user_data)
+                    if success:
+                        st.success(f"✅ {msg}!")
                         st.rerun()
+                    else:
+                        st.error(f"❌ {msg}")
         
         st.markdown("---")
         
-        # Phone Login with OTP
+        # Phone Login with OTP (مصحح)
         st.markdown("### 📱 تسجيل الدخول عبر الهاتف")
         phone = st.text_input("📱 رقم الهاتف", placeholder="مثال: 777700412", key="phone_input")
         if st.button("📲 إرسال رمز التحقق", key="send_otp_btn"):
@@ -1184,13 +1232,24 @@ def auth_page():
             otp_input = st.text_input("🔑 أدخل رمز التحقق", type="password", key="otp_input")
             if st.button("✅ تأكيد", key="verify_otp_btn"):
                 if verify_otp(phone, otp_input):
+                    # التحقق من وجود المستخدم
                     if phone in st.session_state.users_db:
                         st.session_state.authenticated = True
                         st.session_state.current_user = st.session_state.users_db[phone]
                     else:
-                        signup_user(f"مستخدم {phone[-4:]}", phone, "", "patient", phone, "", "phone")
-                        st.session_state.authenticated = True
-                        st.session_state.current_user = st.session_state.users_db[phone]
+                        # إنشاء حساب جديد
+                        user_data = {
+                            "name": f"مستخدم {phone[-4:]}",
+                            "specialty": "طبيب أسنان",
+                            "phone": phone,
+                            "country": "اليمن"
+                        }
+                        success, msg = login_with_platform(phone, "phone", user_data)
+                        if success:
+                            st.session_state.authenticated = True
+                            st.session_state.current_user = st.session_state.users_db[phone]
+                            st.success("✅ تم إنشاء الحساب وتسجيل الدخول!")
+                            st.rerun()
                     st.success("✅ تم تسجيل الدخول بنجاح!")
                     st.rerun()
                 else:
@@ -1401,7 +1460,6 @@ def page_smile_simulator():
                     st.image(result, caption="النتيجة المتوقعة", use_container_width=True)
                     st.image(comparison, caption="مقارنة قبل/بعد", use_container_width=True)
                     
-                    # حفظ النتيجة
                     buffered = BytesIO()
                     result.save(buffered, format="PNG")
                     st.download_button(
@@ -1433,7 +1491,6 @@ def page_patients():
         df = pd.DataFrame(st.session_state.patients)
         st.dataframe(df, use_container_width=True)
         
-        # أزرار الإجراءات
         for i, p in enumerate(st.session_state.patients):
             col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
             with col1:
@@ -1486,44 +1543,88 @@ def page_new_patient():
             st.rerun()
 
 # =============================================================
-# PAGE: DENTAL CHART
+# PAGE: DENTAL CHART (محدثة مع تفعيل الأزرار)
 # =============================================================
 def page_dental_chart():
     st.markdown('<h2>🦷 مخطط <span style="color:#e67e22;">الأسنان</span></h2>', unsafe_allow_html=True)
     st.caption("اضغط على السن لتغيير حالته")
     
-    st.markdown(render_dental_chart(), unsafe_allow_html=True)
+    # عرض المخطط التفاعلي
+    col1, col2 = st.columns([3, 1])
     
-    col1, col2, col3 = st.columns(3)
     with col1:
+        st.markdown(render_dental_chart(), unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("### 🎯 التحكم")
+        
+        # إظهار السن المحدد
+        if st.session_state.selected_tooth is not None:
+            tooth_num = st.session_state.selected_tooth + 1
+            current_status = get_tooth_status(st.session_state.selected_tooth)
+            status_labels = {
+                'normal': '🟢 سليم',
+                'missing': '❌ مفقود',
+                'carious': '🟡 نخر',
+                'treated': '🔵 معالج',
+                'crown': '🟣 تاج',
+                'root-canal': '🔴 جذور'
+            }
+            st.markdown(f"""
+            <div style="background:#1e293b; padding:12px; border-radius:12px; border:1px solid #334155; text-align:center; margin-bottom:12px;">
+                <div style="font-size:0.8rem; color:#94a3b8;">السن المحدد</div>
+                <div style="font-size:2rem; font-weight:800; color:#e67e22;">#{tooth_num}</div>
+                <div style="font-size:0.9rem;">{status_labels.get(current_status, 'غير معروف')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # أزرار تغيير الحالة
+            st.markdown("#### تغيير الحالة")
+            statuses = [
+                ("🟢 سليم", "normal"),
+                ("❌ مفقود", "missing"),
+                ("🟡 نخر", "carious"),
+                ("🔵 معالج", "treated"),
+                ("🟣 تاج", "crown"),
+                ("🔴 جذور", "root-canal")
+            ]
+            
+            for label, status in statuses:
+                if st.button(label, key=f"tooth_status_{status}", use_container_width=True):
+                    if update_tooth_status(st.session_state.selected_tooth, status):
+                        st.success(f"✅ تم تحديث السن #{tooth_num} إلى {label}")
+                        st.rerun()
+        else:
+            st.info("👆 اضغط على سن في المخطط")
+    
+    # أزرار عامة
+    col_actions1, col_actions2, col_actions3 = st.columns(3)
+    with col_actions1:
         if st.button("🔄 إعادة ضبط المخطط", use_container_width=True):
-            st.session_state.dental_chart = ['normal'] * 32
+            for i in range(32):
+                update_tooth_status(i, "normal")
+            st.session_state.selected_tooth = None
             st.success("✅ تم إعادة ضبط المخطط")
             st.rerun()
-    with col2:
+    with col_actions2:
         if st.button("💾 حفظ المخطط", use_container_width=True, type="primary"):
             st.success("✅ تم حفظ المخطط")
-    with col3:
-        st.markdown("### حالات الأسنان")
-        status_counts = {
-            "سليم": st.session_state.dental_chart.count('normal'),
-            "مفقود": st.session_state.dental_chart.count('missing'),
-            "نخر": st.session_state.dental_chart.count('carious'),
-            "معالج": st.session_state.dental_chart.count('treated'),
-            "تاج": st.session_state.dental_chart.count('crown'),
-            "جذور": st.session_state.dental_chart.count('root-canal')
-        }
-        for k, v in status_counts.items():
-            st.write(f"{k}: {v}")
+    with col_actions3:
+        if st.button("📊 إحصائيات", use_container_width=True):
+            status_counts = {}
+            for i in range(32):
+                status = get_tooth_status(i)
+                status_counts[status] = status_counts.get(status, 0) + 1
+            st.info(f"📊 حالات الأسنان:\n{status_counts}")
 
 def render_dental_chart():
-    chart = st.session_state.dental_chart
+    """عرض مخطط الأسنان التفاعلي"""
     html = '<div class="dental-chart-wrapper"><div class="dental-chart">'
     
-    # Upper arch
+    # الفك العلوي
     html += '<div class="dental-arch"><div class="arch-label">⬆ الفك العلوي</div><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;">'
     for i in range(16):
-        status = chart[i] if i < len(chart) else 'normal'
+        status = get_tooth_status(i)
         status_map = {
             'normal': {'icon': '🟢', 'cls': ''},
             'missing': {'icon': '', 'cls': 'missing'},
@@ -1534,13 +1635,13 @@ def render_dental_chart():
         }
         s = status_map.get(status, status_map['normal'])
         icon_html = '' if status == 'missing' else f'<span class="status-icon">{s["icon"]}</span>'
-        html += f'<div class="tooth {s["cls"]}" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
+        html += f'<div class="tooth {s["cls"]}" onclick="selectTooth({i})" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
     html += '</div></div>'
     
-    # Lower arch
+    # الفك السفلي
     html += '<div class="dental-arch"><div class="arch-label">⬇ الفك السفلي</div><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;">'
     for i in range(16, 32):
-        status = chart[i] if i < len(chart) else 'normal'
+        status = get_tooth_status(i)
         status_map = {
             'normal': {'icon': '🟢', 'cls': ''},
             'missing': {'icon': '', 'cls': 'missing'},
@@ -1551,7 +1652,7 @@ def render_dental_chart():
         }
         s = status_map.get(status, status_map['normal'])
         icon_html = '' if status == 'missing' else f'<span class="status-icon">{s["icon"]}</span>'
-        html += f'<div class="tooth {s["cls"]}" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
+        html += f'<div class="tooth {s["cls"]}" onclick="selectTooth({i})" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
     html += '</div></div>'
     
     # Legend
@@ -1564,10 +1665,23 @@ def render_dental_chart():
         <div class="legend-item"><span class="swatch root-canal"></span> علاج جذور</div>
     </div>'''
     html += '</div></div>'
+    
+    # JavaScript للتفاعل مع الأسنان
+    html += '''
+    <script>
+    function selectTooth(index) {
+        // إرسال الطلب إلى Streamlit
+        const event = new CustomEvent('streamlit:setComponentValue', {
+            detail: { key: 'selected_tooth', value: index }
+        });
+        window.dispatchEvent(event);
+    }
+    </script>
+    '''
     return html
 
 # =============================================================
-# PAGE: NATURAL TEETH
+# PAGE: NATURAL TEETH (محدثة مع تفعيل الأزرار)
 # =============================================================
 def page_natural_teeth():
     st.markdown('<h2>🦷 الأسنان الطبيعية <span style="color:#e67e22;">Natural Teeth</span></h2>', unsafe_allow_html=True)
@@ -1577,7 +1691,6 @@ def page_natural_teeth():
     with col1:
         st.markdown("#### 🎨 توليد أسنان طبيعية")
         teeth_count = st.slider("عدد الأسنان", 6, 16, 10)
-        tooth_color = st.color_picker("لون الأسنان", "#F5F0E8")
         
         if st.button("🦷 توليد أسنان طبيعية", type="primary", use_container_width=True):
             img = generate_natural_teeth(teeth_count)
@@ -1588,14 +1701,54 @@ def page_natural_teeth():
                 "created_at": datetime.now().isoformat()
             })
             st.success("✅ تم توليد وحفظ الأسنان الطبيعية!")
+            st.balloons()
     
     with col2:
         st.markdown("#### 📸 الأسنان المحفوظة")
         if st.session_state.natural_teeth_layers:
             for i, teeth in enumerate(st.session_state.natural_teeth_layers[-6:]):
-                st.image(teeth["image"], caption=f"{teeth['name']}", use_container_width=True)
+                with st.container():
+                    col_img, col_btn = st.columns([3, 1])
+                    with col_img:
+                        st.image(teeth["image"], caption=f"{teeth['name']}", use_container_width=True)
+                    with col_btn:
+                        if st.button("🗑️", key=f"del_teeth_{i}"):
+                            st.session_state.natural_teeth_layers.pop(i)
+                            st.rerun()
         else:
             st.info("لا توجد أسنان طبيعية محفوظة")
+    
+    # عرض حالة الأسنان من المخطط
+    st.markdown("---")
+    st.markdown("#### 📊 حالة الأسنان الحالية")
+    
+    status_counts = {}
+    for i in range(32):
+        status = get_tooth_status(i)
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    # عرض الإحصائيات بشكل مرتب
+    status_labels = {
+        'normal': 'سليم',
+        'missing': 'مفقود',
+        'carious': 'نخر',
+        'treated': 'معالج',
+        'crown': 'تاج',
+        'root-canal': 'جذور'
+    }
+    
+    cols = st.columns(3)
+    for idx, (status, label) in enumerate(status_labels.items()):
+        with cols[idx % 3]:
+            count = status_counts.get(status, 0)
+            st.markdown(f"""
+            <div class="teeth-card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>{label}</span>
+                    <span class="tooth-status status-{status}">{count}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # =============================================================
 # PAGE: PHOTOGRAPHY
@@ -1796,12 +1949,18 @@ def page_members():
     
     for email, u in st.session_state.users_db.items():
         status = "🟢" if u.get("online", True) else "🔴"
+        platforms = u.get("platforms", ["email"])
+        platform_icons = {'email': '📧', 'google': '🔵', 'facebook': '🔷', 'instagram': '🟣', 
+                         'linkedin': '🔵', 'twitter': '🔷', 'whatsapp': '🟢', 'phone': '📱'}
+        platform_text = ' '.join([platform_icons.get(p, '📧') for p in platforms])
+        
         st.markdown(f"""
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <strong>{u['name']}</strong>
                 <span style="font-size:0.75rem; color:#94a3b8; margin-right:12px;">{u.get('specialty','')}</span>
                 <div style="font-size:0.7rem; color:#64748b;">{email}</div>
+                <div style="font-size:0.6rem; color:#94a3b8;">{platform_text}</div>
             </div>
             <div>
                 <span style="font-size:0.7rem;">{status}</span>
@@ -2016,7 +2175,6 @@ def page_facial():
 def page_cephalometric():
     st.markdown('<h2>🩻 تحليل <span style="color:#e67e22;">الأشعة</span></h2>', unsafe_allow_html=True)
     
-    # عرض جدول الزوايا السيفالومترية
     st.markdown("### 📐 الزوايا السيفالومترية")
     
     data = st.session_state.cephalometric_data
@@ -2026,7 +2184,6 @@ def page_cephalometric():
         "Overjet": 3, "Overbite": 2
     }
     
-    # عرض الجدول
     ceph_data = []
     for key in ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"]:
         patient_val = data.get(key, 0)
@@ -2043,7 +2200,6 @@ def page_cephalometric():
     
     st.table(pd.DataFrame(ceph_data))
     
-    # تحديث القيم
     st.markdown("### ✏️ تعديل القيم")
     col1, col2 = st.columns(2)
     for i, key in enumerate(["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"]):
@@ -2662,8 +2818,7 @@ def page_forum():
             </div>
             """, unsafe_allow_html=True)
 
-# =============================================================
-# PAGE: CAD/CAM
+# =============================================================# PAGE: CAD/CAM
 # =============================================================
 def page_cadcam():
     st.markdown('<h2>⚙️ CAD/CAM & 3D <span style="color:#e67e22;">(نموذج افتراضي جاهز)</span></h2>', unsafe_allow_html=True)
@@ -2737,7 +2892,6 @@ def page_image_editor():
     st.markdown('<h2>🎨 محرر الصور المتقدم <span style="color:#e67e22;">(Photopea-like)</span></h2>', unsafe_allow_html=True)
     st.caption("قص، تعديل، إضافة طبقات، رسم FaceMesh، وتحرير الأسنان والفك")
     
-    # تهيئة الطبقات إذا كانت فارغة
     if not st.session_state.image_layers:
         base_img = Image.new('RGB', (800, 600), color='#1a1a2e')
         draw = ImageDraw.Draw(base_img)
@@ -2932,6 +3086,16 @@ PAGES = {
 # MAIN
 # =============================================================
 def main():
+    # معالجة اختيار السن من JavaScript
+    if "selected_tooth" in st.query_params:
+        try:
+            tooth_idx = int(st.query_params["selected_tooth"])
+            if 0 <= tooth_idx < 32:
+                st.session_state.selected_tooth = tooth_idx
+                st.query_params.pop("selected_tooth", None)
+        except:
+            pass
+    
     if not st.session_state.authenticated:
         auth_page()
     else:
