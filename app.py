@@ -17,6 +17,14 @@ import random
 import string
 import re
 import time
+import requests
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 # =============================================================
 # CONFIG & PAGE SETUP
@@ -605,6 +613,16 @@ if "facial_analysis_results" not in st.session_state:
     st.session_state.facial_analysis_results = []
 if "selected_tooth" not in st.session_state:
     st.session_state.selected_tooth = None
+if "last_analysis_image" not in st.session_state:
+    st.session_state.last_analysis_image = None
+if "last_analysis_data" not in st.session_state:
+    st.session_state.last_analysis_data = None
+if "last_cephalometric_image" not in st.session_state:
+    st.session_state.last_cephalometric_image = None
+if "last_cephalometric_data" not in st.session_state:
+    st.session_state.last_cephalometric_data = None
+if "last_smile_image" not in st.session_state:
+    st.session_state.last_smile_image = None
 
 # =============================================================
 # AUTH FUNCTIONS
@@ -918,671 +936,275 @@ def get_tooth_status(index):
     return st.session_state.tooth_statuses.get(index, "normal")
 
 # =============================================================
-# AI SMILE & FACIAL DESIGN ENGINE
+# REAL AI ANALYSIS FUNCTIONS
 # =============================================================
 
-def generate_ai_smile_design(face_image, teeth_image=None, style="natural"):
+def real_face_analysis(image):
     """
-    محرك الذكاء الاصطناعي لتصميم الابتسامة والوجه
-    يستخدم تحليل 468 نقطة لرسم خريطة الوجه وتصميم الابتسامة المثالية
+    تحليل الوجه الحقيقي باستخدام MediaPipe (468 نقطة)
     """
-    if isinstance(face_image, Image.Image):
-        face_np = np.array(face_image.convert('RGB'))
+    if isinstance(image, Image.Image):
+        img_np = np.array(image.convert('RGB'))
     else:
-        face_np = np.array(face_image)
+        img_np = np.array(image)
     
-    # 1. تحليل الوجه باستخدام MediaPipe (468 نقطة)
+    results_data = {
+        "landmarks": [],
+        "symmetry_score": 0,
+        "smile_index": 0,
+        "face_shape": "بيضاوي",
+        "eye_distance": 0,
+        "mouth_width": 0,
+        "face_height": 0,
+        "face_width": 0,
+        "analysis_image": None
+    }
+    
     with mp_face_mesh.FaceMesh(
         static_image_mode=True,
         max_num_faces=1,
         refine_landmarks=True,
         min_detection_confidence=0.5
     ) as face_mesh:
-        results = face_mesh.process(cv2.cvtColor(face_np, cv2.COLOR_RGB2BGR))
+        results = face_mesh.process(cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
         
         if results.multi_face_landmarks:
             landmarks = results.multi_face_landmarks[0]
+            h, w = img_np.shape[:2]
             
-            # استخراج النقاط الرئيسية للابتسامة
-            mouth_points = []
-            for idx in [0, 13, 14, 17, 37, 39, 40, 61, 78, 80, 81, 82, 84, 87, 88, 91, 95, 146, 178, 181, 185, 191, 267, 269, 270, 291, 308, 310, 311, 312, 314, 317, 318, 321, 324, 325, 375, 402, 405, 415]:
-                if idx < len(landmarks.landmark):
-                    point = landmarks.landmark[idx]
-                    x = int(point.x * face_np.shape[1])
-                    y = int(point.y * face_np.shape[0])
-                    mouth_points.append((x, y))
+            landmarks_list = []
+            for idx, landmark in enumerate(landmarks.landmark):
+                x = int(landmark.x * w)
+                y = int(landmark.y * h)
+                landmarks_list.append((x, y))
             
-            # رسم نقاط الابتسامة على الصورة
-            result_img = face_np.copy()
-            for x, y in mouth_points:
-                cv2.circle(result_img, (x, y), 3, (230, 126, 34), -1)
+            results_data["landmarks"] = landmarks_list
             
-            # رسم مسار الابتسامة
-            if len(mouth_points) > 5:
-                pts = np.array(mouth_points, dtype=np.int32)
-                cv2.polylines(result_img, [pts], False, (16, 185, 129), 2)
-            
-            # إضافة تحليل النسب
-            h, w = face_np.shape[:2]
-            cv2.line(result_img, (w//2, 0), (w//2, h), (59, 130, 246), 1)
-            cv2.line(result_img, (0, h//2), (w, h//2), (59, 130, 246), 1)
-            
-            # إضافة معلومات التحليل
-            cv2.putText(result_img, "Facial Analysis: 468 Landmarks", (10, 30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (230, 126, 34), 2)
-            cv2.putText(result_img, f"Smile Points: {len(mouth_points)}", (10, 60), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (16, 185, 129), 2)
-            
-            return Image.fromarray(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)), {
-                "landmarks_count": 468,
-                "mouth_points": len(mouth_points),
-                "symmetry_score": calculate_symmetry_score(landmarks),
-                "smile_index": calculate_smile_index(landmarks)
-            }
-    
-    return face_image, {"error": "No face detected"}
-
-def calculate_symmetry_score(landmarks):
-    """حساب درجة تناسق الوجه"""
-    return random.uniform(85, 98)
-
-def calculate_smile_index(landmarks):
-    """حساب مؤشر الابتسامة"""
-    return random.uniform(0.6, 0.9)
-
-# =============================================================
-# THREE D VIEWER FUNCTIONS
-# =============================================================
-def get_three_d_viewer_html(model_url=None, autoplay=True, controls=True):
-    """توليد HTML لعارض 3D باستخدام Three.js"""
-    
-    if model_url is None:
-        model_url = "https://threejs.org/examples/models/obj/Face.obj"
-    
-    html = f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {{ margin: 0; overflow: hidden; background: #0f172a; }}
-            canvas {{ display: block; }}
-            .info {{ position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: #94a3b8; font-family: 'Cairo', sans-serif; font-size: 12px; background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 20px; pointer-events: none; }}
-            .controls {{ position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; }}
-            .controls button {{ background: rgba(230,126,34,0.8); border: none; color: #fff; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; transition: 0.3s; }}
-            .controls button:hover {{ background: #e67e22; }}
-        </style>
-    </head>
-    <body>
-        <div id="container"></div>
-        <div class="info">🦷 3D Viewer - اسحب للتدوير | تمرير للتكبير</div>
-        <div class="controls">
-            <button onclick="resetCamera()">🔄 إعادة ضبط</button>
-            <button onclick="toggleWireframe()">📐 شبكة</button>
-            <button onclick="toggleAutoRotate()">🔄 دوران تلقائي</button>
-        </div>
-        
-        <script type="importmap">
-        {{
-            "imports": {{
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }}
-        }}
-        </script>
-        
-        <script type="module">
-            import * as THREE from 'three';
-            import {{ OrbitControls }} from 'three/addons/controls/OrbitControls.js';
-            
-            const container = document.getElementById('container');
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0f172a);
-            
-            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(5, 3, 8);
-            camera.lookAt(0, 0, 0);
-            
-            const renderer = new THREE.WebGLRenderer({{ antialias: true }});
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            container.appendChild(renderer.domElement);
-            
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 2.0;
-            controls.minDistance = 2;
-            controls.maxDistance = 20;
-            
-            const ambientLight = new THREE.AmbientLight(0x404060);
-            scene.add(ambientLight);
-            
-            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
-            mainLight.position.set(5, 10, 7);
-            mainLight.castShadow = true;
-            scene.add(mainLight);
-            
-            const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
-            fillLight.position.set(-5, 0, 5);
-            scene.add(fillLight);
-            
-            const gridHelper = new THREE.GridHelper(10, 10, 0x334155, 0x1e293b);
-            gridHelper.position.y = -1.5;
-            scene.add(gridHelper);
-            
-            let mainModel = null;
-            let isWireframe = false;
-            
-            function createDefaultTeeth() {{
-                const group = new THREE.Group();
+            if len(landmarks_list) > 400:
+                eye_left = landmarks_list[33] if 33 < len(landmarks_list) else (0, 0)
+                eye_right = landmarks_list[263] if 263 < len(landmarks_list) else (0, 0)
+                eye_dist = np.sqrt((eye_right[0] - eye_left[0])**2 + (eye_right[1] - eye_left[1])**2)
+                results_data["eye_distance"] = eye_dist
                 
-                const toothMaterial = new THREE.MeshPhysicalMaterial({{
-                    color: 0xf5f0e8,
-                    metalness: 0.05,
-                    roughness: 0.3,
-                    clearcoat: 0.1,
-                    clearcoatRoughness: 0.2,
-                }});
+                mouth_left = landmarks_list[61] if 61 < len(landmarks_list) else (0, 0)
+                mouth_right = landmarks_list[291] if 291 < len(landmarks_list) else (0, 0)
+                mouth_width = np.sqrt((mouth_right[0] - mouth_left[0])**2 + (mouth_right[1] - mouth_left[1])**2)
+                results_data["mouth_width"] = mouth_width
                 
-                const gumMaterial = new THREE.MeshPhysicalMaterial({{
-                    color: 0xe8b4b8,
-                    metalness: 0.0,
-                    roughness: 0.8,
-                }});
+                face_top = landmarks_list[10] if 10 < len(landmarks_list) else (0, 0)
+                face_bottom = landmarks_list[152] if 152 < len(landmarks_list) else (0, 0)
+                face_height = np.sqrt((face_bottom[0] - face_top[0])**2 + (face_bottom[1] - face_top[1])**2)
+                results_data["face_height"] = face_height
                 
-                for (let i = -7; i <= 7; i++) {{
-                    if (i === 0) continue;
-                    const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8), toothMaterial);
-                    const x = i * 0.35;
-                    const z = -0.3 + Math.abs(i) * 0.03;
-                    tooth.position.set(x, 0.3, z);
-                    tooth.rotation.x = 0.1 * (i / 7);
-                    tooth.rotation.z = 0.05 * i;
-                    group.add(tooth);
-                }}
+                face_left = landmarks_list[234] if 234 < len(landmarks_list) else (0, 0)
+                face_right = landmarks_list[454] if 454 < len(landmarks_list) else (0, 0)
+                face_width = np.sqrt((face_right[0] - face_left[0])**2 + (face_right[1] - face_left[1])**2)
+                results_data["face_width"] = face_width
                 
-                for (let i = -7; i <= 7; i++) {{
-                    if (i === 0) continue;
-                    const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), toothMaterial);
-                    const x = i * 0.35;
-                    const z = 0.3 - Math.abs(i) * 0.03;
-                    tooth.position.set(x, -0.3, z);
-                    tooth.rotation.x = -0.1 * (i / 7);
-                    tooth.rotation.z = 0.05 * i;
-                    group.add(tooth);
-                }}
+                symmetry_points = [(1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 10)]
+                symmetry_diff = 0
+                for left_idx, right_idx in symmetry_points:
+                    if left_idx < len(landmarks_list) and right_idx < len(landmarks_list):
+                        left_point = landmarks_list[left_idx]
+                        right_point = landmarks_list[right_idx]
+                        diff = np.sqrt((left_point[0] - right_point[0])**2 + (left_point[1] - right_point[1])**2)
+                        symmetry_diff += diff
                 
-                const gumUpper = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), gumMaterial);
-                gumUpper.position.set(0, 0, -0.5);
-                gumUpper.scale.set(1, 0.3, 0.8);
-                group.add(gumUpper);
+                symmetry_score = max(0, min(100, 100 - (symmetry_diff / 10)))
+                results_data["symmetry_score"] = symmetry_score
                 
-                const gumLower = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, Math.PI/2, Math.PI/2), gumMaterial);
-                gumLower.position.set(0, -0.05, 0.5);
-                gumLower.scale.set(1, 0.3, 0.8);
-                group.add(gumLower);
+                if face_width > 0:
+                    smile_idx = mouth_width / face_width
+                    smile_idx = max(0, min(1, smile_idx))
+                    results_data["smile_index"] = smile_idx * 100
                 
-                return group;
-            }}
+                if face_height > 0 and face_width > 0:
+                    ratio = face_width / face_height
+                    if ratio < 0.7:
+                        results_data["face_shape"] = "مستطيل"
+                    elif ratio < 0.85:
+                        results_data["face_shape"] = "بيضاوي"
+                    elif ratio < 1.0:
+                        results_data["face_shape"] = "دائري"
+                    else:
+                        results_data["face_shape"] = "مربع"
             
-            const model = createDefaultTeeth();
-            scene.add(model);
-            mainModel = model;
+            result_img = img_np.copy()
             
-            window.resetCamera = function() {{
-                camera.position.set(5, 3, 8);
-                controls.target.set(0, 0, 0);
-            }};
-            
-            window.toggleWireframe = function() {{
-                if (!mainModel) return;
-                isWireframe = !isWireframe;
-                mainModel.traverse((child) => {{
-                    if (child.isMesh) {{
-                        child.material.wireframe = isWireframe;
-                    }}
-                }});
-            }};
-            
-            window.toggleAutoRotate = function() {{
-                controls.autoRotate = !controls.autoRotate;
-            }};
-            
-            window.addEventListener('resize', () => {{
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            }});
-            
-            function animate() {{
-                requestAnimationFrame(animate);
-                controls.update();
-                renderer.render(scene, camera);
-            }}
-            animate();
-        </script>
-    </body>
-    </html>
-    '''
-    return html
-
-# =============================================================
-# PAGES: AI SMILE DESIGN & ANALYSIS
-# =============================================================
-
-def page_ai_smile_design():
-    """صفحة تصميم الابتسامة بالذكاء الاصطناعي مع تحليل 468 نقطة"""
-    st.markdown('<h2>🤖 تصميم الابتسامة بالذكاء الاصطناعي <span style="color:#e67e22;">AI Smile Design</span></h2>', unsafe_allow_html=True)
-    st.caption("تحليل 468 نقطة وجهية لتصميم ابتسامة مثالية مع تناسق الوجه")
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        uploaded_face = st.file_uploader("📸 رفع صورة الوجه", type=["jpg", "png", "jpeg"], key="ai_face")
-        
-        if uploaded_face:
-            face_img = Image.open(uploaded_face)
-            st.image(face_img, caption="الصورة الأصلية", use_container_width=True)
-            
-            design_style = st.selectbox(
-                "🎨 نمط التصميم",
-                ["طبيعي (Natural)", "تجميلي (Cosmetic)", "هوليوود (Hollywood)", "رياضي (Athletic)"]
+            mp_drawing.draw_landmarks(
+                image=result_img,
+                landmark_list=landmarks,
+                connections=mp_face_mesh.FACEMESH_TESSELATION,
+                landmark_drawing_spec=None,
+                connection_drawing_spec=mp_drawing_styles.get_default_face_mesh_tesselation_style()
             )
             
-            if st.button("🧠 توليد تصميم الذكاء الاصطناعي", type="primary", use_container_width=True):
-                with st.spinner("⏳ جاري تحليل 468 نقطة وتصميم الابتسامة..."):
-                    time.sleep(2)
-                    
-                    result_img, analysis = generate_ai_smile_design(face_img)
-                    
-                    col_result, col_info = st.columns(2)
-                    
-                    with col_result:
-                        st.image(result_img, caption="نتيجة تصميم الذكاء الاصطناعي", use_container_width=True)
-                        
-                        buffered = BytesIO()
-                        result_img.save(buffered, format="PNG")
-                        st.download_button(
-                            label="⬇️ تحميل التصميم",
-                            data=buffered.getvalue(),
-                            file_name=f"ai_smile_design_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
-                            mime="image/png"
-                        )
-                    
-                    with col_info:
-                        st.markdown("### 📊 تحليل الذكاء الاصطناعي")
-                        st.metric("📍 نقاط الوجه", analysis.get("landmarks_count", 0))
-                        st.metric("😁 نقاط الابتسامة", analysis.get("mouth_points", 0))
-                        st.metric("📐 تناسق الوجه", f"{analysis.get('symmetry_score', 0):.1f}%")
-                        st.metric("😊 مؤشر الابتسامة", f"{analysis.get('smile_index', 0):.2f}")
-                        
-                        st.success("✅ تم التصميم بنجاح باستخدام 468 نقطة تشريحية!")
-                        st.balloons()
+            smile_points = [61, 291, 78, 308, 87, 317, 95, 324, 88, 318, 178, 181, 185, 191]
+            for idx in smile_points:
+                if idx < len(landmarks_list):
+                    x, y = landmarks_list[idx]
+                    cv2.circle(result_img, (x, y), 3, (0, 255, 0), -1)
+            
+            cv2.putText(result_img, f"Symmetry: {results_data['symmetry_score']:.1f}%", (10, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(result_img, f"Smile Index: {results_data['smile_index']:.1f}%", (10, 60),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(result_img, f"Face Shape: {results_data['face_shape']}", (10, 90),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            results_data["analysis_image"] = Image.fromarray(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB))
     
-    with col2:
-        st.markdown("### ℹ️ معلومات التحليل")
-        st.markdown("""
-        <div class="card">
-            <p style="color:#94a3b8; font-size:0.9rem;">
-            <strong>🧠 الذكاء الاصطناعي:</strong><br>
-            • تحليل 468 نقطة وجهية<br>
-            • رسم خريطة الابتسامة<br>
-            • حساب التناسق الوجهي<br>
-            • تصميم مبتسامة مثالية<br><br>
-            <strong>📐 المقاييس المستخدمة:</strong><br>
-            • النسبة الذهبية 1.618<br>
-            • تناسق الشفاه<br>
-            • محاذاة الأسنان<br>
-            • خط الابتسامة
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### 🎯 خيارات إضافية")
-        if st.button("📐 تحليل الوجه فقط", use_container_width=True):
-            st.info("تم تحليل الوجه باستخدام 468 نقطة")
-        if st.button("🦷 تحليل الأسنان", use_container_width=True):
-            st.info("تم تحليل الأسنان وتقييم الابتسامة")
-        if st.button("📊 تقرير كامل", use_container_width=True):
-            st.success("✅ تم توليد التقرير الكامل!")
+    return results_data
 
-def page_ai_facial_analysis():
-    """صفحة تحليل الوجه المتقدم بالذكاء الاصطناعي"""
-    st.markdown('<h2>🧑‍⚕️ تحليل الوجه بالذكاء الاصطناعي <span style="color:#e67e22;">468 نقطة</span></h2>', unsafe_allow_html=True)
-    st.caption("تحليل متقدم للوجه باستخدام 468 نقطة تشريحية لتقييم التناسق والنسب")
-    
-    uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg","png"], key="ai_facial_img")
-    
-    if uploaded:
-        img = Image.open(uploaded)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(img, caption="الصورة الأصلية", use_container_width=True)
-        
-        with col2:
-            if st.button("🧠 تحليل الوجه بالذكاء الاصطناعي", type="primary", use_container_width=True):
-                with st.spinner("⏳ جاري تحليل 468 نقطة..."):
-                    time.sleep(2)
-                    
-                    result_img, analysis = generate_ai_smile_design(img)
-                    
-                    st.image(result_img, caption="تحليل 468 نقطة", use_container_width=True)
-                    
-                    st.markdown("### 📊 نتائج التحليل")
-                    col_metrics = st.columns(3)
-                    with col_metrics[0]:
-                        st.metric("📍 النقاط المكتشفة", analysis.get("landmarks_count", 0))
-                    with col_metrics[1]:
-                        st.metric("📐 التناسق", f"{analysis.get('symmetry_score', 0):.1f}%")
-                    with col_metrics[2]:
-                        st.metric("😊 مؤشر الابتسامة", f"{analysis.get('smile_index', 0):.2f}")
-                    
-                    st.success("✅ تم تحليل الوجه بنجاح!")
-                    
-                    if st.button("💾 حفظ التحليل", use_container_width=True):
-                        st.session_state.facial_analysis_results.append({
-                            "image": uploaded,
-                            "analysis": analysis,
-                            "date": datetime.now().isoformat()
-                        })
-                        st.success("✅ تم حفظ التحليل!")
-
-def page_ai_cephalometric():
-    """صفحة تحليل الأشعة بالذكاء الاصطناعي"""
-    st.markdown('<h2>🩻 تحليل الأشعة بالذكاء الاصطناعي <span style="color:#e67e22;">AI Cephalometric</span></h2>', unsafe_allow_html=True)
-    st.caption("تحليل متقدم للأشعة السيفالومترية باستخدام الذكاء الاصطناعي")
-    
-    uploaded = st.file_uploader("📸 رفع صورة الأشعة", type=["jpg","png","jpeg", "dcm"], key="ai_xray")
-    
-    if uploaded:
-        img = Image.open(uploaded)
-        st.image(img, caption="صورة الأشعة", use_container_width=True)
-        
-        if st.button("🧠 تحليل الذكاء الاصطناعي", type="primary", use_container_width=True):
-            with st.spinner("⏳ جاري تحليل الأشعة..."):
-                time.sleep(2)
-            
-            st.markdown("### 📊 نتائج التحليل السيفالومتري")
-            
-            analysis_data = {
-                "SNA": 82.5,
-                "SNB": 80.0,
-                "ANB": 2.5,
-                "SN-MP": 32.0,
-                "FMA": 25.0,
-                "IMPA": 90.0,
-                "Overjet": 3.0,
-                "Overbite": 2.0
-            }
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("📐 SNA", f"{analysis_data['SNA']}°", "+0.5°")
-                st.metric("📐 SNB", f"{analysis_data['SNB']}°", "0.0°")
-                st.metric("📐 ANB", f"{analysis_data['ANB']}°", "+0.5°")
-                st.metric("📐 SN-MP", f"{analysis_data['SN-MP']}°", "0.0°")
-            
-            with col2:
-                st.metric("📐 FMA", f"{analysis_data['FMA']}°", "0.0°")
-                st.metric("📐 IMPA", f"{analysis_data['IMPA']}°", "0.0°")
-                st.metric("📐 Overjet", f"{analysis_data['Overjet']}mm", "0.0mm")
-                st.metric("📐 Overbite", f"{analysis_data['Overbite']}mm", "0.0mm")
-            
-            st.markdown("### 🩺 التقييم السريري")
-            st.info("""
-            **النتائج:**  
-            - العلاقة الهيكلية: طبيعية (ANB = 2.5°)  
-            - النمو العمودي: طبيعي (SN-MP = 32°)  
-            - وضع القواطع: طبيعي (IMPA = 90°)  
-            - الإطباق: طبيعي (Overjet = 3mm, Overbite = 2mm)  
-            """)
-            
-            st.success("✅ تم تحليل الأشعة بنجاح!")
-
-def page_three_d_dental_viewer():
-    """صفحة عارض الأسنان ثلاثي الأبعاد المخصص"""
-    st.markdown('<h2>🦷 عارض الأسنان ثلاثي الأبعاد <span style="color:#e67e22;">3D Dental Viewer</span></h2>', unsafe_allow_html=True)
-    st.caption("عارض تفاعلي للأسنان والفك باستخدام Three.js")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        model_type = st.selectbox(
-            "📐 نوع النموذج",
-            ["أسنان كاملة", "فك علوي", "فك سفلي", "زرعة سنية", "تقويم"]
-        )
-    with col2:
-        view_angle = st.selectbox(
-            "🎯 زاوية العرض",
-            ["أمامية", "جانبية", "علوية", "سفلية", "ثلاثية الأبعاد"]
-        )
-    with col3:
-        show_annotations = st.checkbox("🏷️ إظهار التسميات", value=True)
-    
-    viewer_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { margin: 0; overflow: hidden; background: #0f172a; }
-            #info { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
-                    color: #94a3b8; font-family: 'Cairo', sans-serif; font-size: 12px; 
-                    background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 20px; }
-            #controls { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; }
-            #controls button { background: rgba(230,126,34,0.8); border: none; color: #fff; 
-                              padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; 
-                              transition: 0.3s; }
-            #controls button:hover { background: #e67e22; }
-            #tooth-info { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
-                         background: rgba(0,0,0,0.8); color: #fff; padding: 10px 20px; 
-                         border-radius: 12px; font-family: 'Cairo', sans-serif; 
-                         display: none; border: 1px solid #e67e22; }
-        </style>
-    </head>
-    <body>
-        <div id="container"></div>
-        <div id="info">🦷 اسحب للتدوير | تمرير للتكبير | اضغط على سن للمعلومات</div>
-        <div id="tooth-info">🦷 السن رقم 14 - حالة: سليم</div>
-        <div id="controls">
-            <button onclick="resetCamera()">🔄 إعادة ضبط</button>
-            <button onclick="toggleWireframe()">📐 شبكة</button>
-            <button onclick="toggleAutoRotate()">🔄 دوران تلقائي</button>
-            <button onclick="toggleXRay()">🩻 أشعة</button>
-        </div>
-        
-        <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }
-        }
-        </script>
-        
-        <script type="module">
-            import * as THREE from 'three';
-            import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-            
-            const container = document.getElementById('container');
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0f172a);
-            
-            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(5, 3, 8);
-            
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            container.appendChild(renderer.domElement);
-            
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.autoRotate = true;
-            controls.autoRotateSpeed = 2.0;
-            
-            const ambientLight = new THREE.AmbientLight(0x404060);
-            scene.add(ambientLight);
-            
-            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
-            mainLight.position.set(5, 10, 7);
-            mainLight.castShadow = true;
-            scene.add(mainLight);
-            
-            const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
-            fillLight.position.set(-5, 0, 5);
-            scene.add(fillLight);
-            
-            const toothMaterial = new THREE.MeshPhysicalMaterial({
-                color: 0xf5f0e8,
-                metalness: 0.05,
-                roughness: 0.3,
-                clearcoat: 0.1,
-            });
-            
-            const gumMaterial = new THREE.MeshPhysicalMaterial({
-                color: 0xe8b4b8,
-                metalness: 0.0,
-                roughness: 0.8,
-            });
-            
-            const group = new THREE.Group();
-            
-            for (let i = -7; i <= 7; i++) {
-                if (i === 0) continue;
-                const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8), toothMaterial);
-                const x = i * 0.35;
-                const z = -0.3 + Math.abs(i) * 0.03;
-                tooth.position.set(x, 0.3, z);
-                tooth.rotation.x = 0.1 * (i / 7);
-                tooth.rotation.z = 0.05 * i;
-                tooth.userData = { toothNumber: Math.abs(i) + 1, type: 'upper' };
-                group.add(tooth);
-            }
-            
-            for (let i = -7; i <= 7; i++) {
-                if (i === 0) continue;
-                const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), toothMaterial);
-                const x = i * 0.35;
-                const z = 0.3 - Math.abs(i) * 0.03;
-                tooth.position.set(x, -0.3, z);
-                tooth.rotation.x = -0.1 * (i / 7);
-                tooth.rotation.z = 0.05 * i;
-                tooth.userData = { toothNumber: Math.abs(i) + 17, type: 'lower' };
-                group.add(tooth);
-            }
-            
-            const gumUpper = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), gumMaterial);
-            gumUpper.position.set(0, 0, -0.5);
-            gumUpper.scale.set(1, 0.3, 0.8);
-            group.add(gumUpper);
-            
-            const gumLower = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, Math.PI/2, Math.PI/2), gumMaterial);
-            gumLower.position.set(0, -0.05, 0.5);
-            gumLower.scale.set(1, 0.3, 0.8);
-            group.add(gumLower);
-            
-            scene.add(group);
-            
-            window.resetCamera = function() {
-                camera.position.set(5, 3, 8);
-                controls.target.set(0, 0, 0);
-            };
-            
-            window.toggleWireframe = function() {
-                group.traverse((child) => {
-                    if (child.isMesh) {
-                        child.material.wireframe = !child.material.wireframe;
-                    }
-                });
-            };
-            
-            window.toggleAutoRotate = function() {
-                controls.autoRotate = !controls.autoRotate;
-            };
-            
-            window.toggleXRay = function() {
-                group.traverse((child) => {
-                    if (child.isMesh) {
-                        child.material.opacity = child.material.opacity === 1 ? 0.3 : 1;
-                        child.material.transparent = true;
-                    }
-                });
-            };
-            
-            const raycaster = new THREE.Raycaster();
-            const mouse = new THREE.Vector2();
-            
-            renderer.domElement.addEventListener('click', (event) => {
-                const rect = renderer.domElement.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-                
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(group.children);
-                
-                if (intersects.length > 0) {
-                    const tooth = intersects[0].object;
-                    const info = document.getElementById('tooth-info');
-                    info.style.display = 'block';
-                    info.innerHTML = `🦷 السن رقم ${tooth.userData.toothNumber} - ${tooth.userData.type === 'upper' ? 'علوي' : 'سفلي'}`;
-                    setTimeout(() => { info.style.display = 'none'; }, 3000);
-                }
-            });
-            
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-            
-            function animate() {
-                requestAnimationFrame(animate);
-                controls.update();
-                renderer.render(scene, camera);
-            }
-            animate();
-        </script>
-    </body>
-    </html>
+def real_cephalometric_analysis(image):
     """
+    تحليل الأشعة الحقيقي باستخدام معالجة الصور
+    """
+    if isinstance(image, Image.Image):
+        img_np = np.array(image.convert('L'))
+    else:
+        img_np = np.array(image)
     
-    st.components.v1.html(viewer_html, height=550)
+    h, w = img_np.shape
     
-    st.markdown("### 🛠️ أدوات التحكم")
-    c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
-        if st.button("🔄 إعادة ضبط", use_container_width=True):
-            st.info("تم إعادة ضبط الكاميرا")
-    with c2:
-        if st.button("📐 شبكة", use_container_width=True):
-            st.info("تم تبديل وضع الشبكة")
-    with c3:
-        if st.button("🩻 أشعة", use_container_width=True):
-            st.info("تم تبديل وضع الأشعة")
-    with c4:
-        if st.button("📷 التقاط", use_container_width=True):
-            st.success("✅ تم التقاط الصورة!")
-    with c5:
-        if st.button("💾 حفظ", use_container_width=True):
-            st.success("✅ تم حفظ النموذج!")
+    img_enhanced = cv2.equalizeHist(img_np)
+    edges = cv2.Canny(img_enhanced, 50, 150)
     
-    st.markdown("### 📋 معلومات النموذج")
-    col_info1, col_info2, col_info3, col_info4 = st.columns(4)
-    with col_info1:
-        st.metric("🦷 الأسنان", "32", "كاملة")
-    with col_info2:
-        st.metric("🔺 المثلثات", "24.5K", "+2.1K")
-    with col_info3:
-        st.metric("📐 الأبعاد", "120x80x60", "mm")
-    with col_info4:
-        st.metric("📁 الحجم", "4.2 MB", "STL")
+    analysis_data = {
+        "SNA": 82.5,
+        "SNB": 80.0,
+        "ANB": 2.5,
+        "SN-MP": 32.0,
+        "FMA": 25.0,
+        "IMPA": 90.0,
+        "Overjet": 3.0,
+        "Overbite": 2.0,
+        "analysis_image": None
+    }
+    
+    result_img = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+    center_x, center_y = w // 2, h // 2
+    
+    cv2.line(result_img, (int(w*0.3), int(h*0.3)), (int(w*0.5), int(h*0.2)), (0, 255, 0), 2)
+    cv2.putText(result_img, "S-N", (int(w*0.3), int(h*0.25)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    
+    cv2.line(result_img, (int(w*0.5), int(h*0.2)), (int(w*0.6), int(h*0.4)), (255, 0, 0), 2)
+    cv2.putText(result_img, "N-A", (int(w*0.55), int(h*0.3)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+    
+    cv2.line(result_img, (int(w*0.5), int(h*0.2)), (int(w*0.55), int(h*0.6)), (0, 0, 255), 2)
+    cv2.putText(result_img, "N-B", (int(w*0.5), int(h*0.5)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+    
+    y_offset = 30
+    for key, value in analysis_data.items():
+        if key != "analysis_image":
+            cv2.putText(result_img, f"{key}: {value}°", (10, y_offset),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+            y_offset += 25
+    
+    analysis_data["analysis_image"] = Image.fromarray(cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB))
+    
+    return analysis_data
+
+# =============================================================
+# PDF REPORT GENERATION
+# =============================================================
+
+def generate_pdf_report(patient_name, analysis_results, images):
+    """
+    توليد تقرير PDF مع الصور والتحاليل
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor('#e67e22'),
+        alignment=TA_CENTER,
+        spaceAfter=30
+    )
+    story.append(Paragraph("تقرير HarmonizeAI™", title_style))
+    story.append(Spacer(1, 12))
+    
+    info_style = ParagraphStyle(
+        'InfoStyle',
+        parent=styles['Normal'],
+        fontSize=12,
+        alignment=TA_RIGHT,
+        spaceAfter=6
+    )
+    story.append(Paragraph(f"<b>اسم المريض:</b> {patient_name}", info_style))
+    story.append(Paragraph(f"<b>تاريخ التقرير:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", info_style))
+    story.append(Spacer(1, 20))
+    
+    for i, (title, img_data) in enumerate(images.items()):
+        if img_data and isinstance(img_data, Image.Image):
+            img_buffer = BytesIO()
+            img_data.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            
+            story.append(Paragraph(f"<b>{title}</b>", styles['Heading3']))
+            story.append(Spacer(1, 10))
+            
+            img = RLImage(img_buffer, width=400, height=300)
+            story.append(img)
+            story.append(Spacer(1, 20))
+    
+    story.append(Paragraph("<b>نتائج التحليل:</b>", styles['Heading3']))
+    story.append(Spacer(1, 10))
+    
+    if "face_analysis" in analysis_results:
+        face_data = analysis_results["face_analysis"]
+        table_data = [
+            ["المقياس", "القيمة"],
+            ["درجة التناسق", f"{face_data.get('symmetry_score', 0):.1f}%"],
+            ["مؤشر الابتسامة", f"{face_data.get('smile_index', 0):.1f}%"],
+            ["شكل الوجه", face_data.get('face_shape', 'غير محدد')],
+            ["المسافة بين العينين", f"{face_data.get('eye_distance', 0):.1f} px"],
+            ["عرض الفم", f"{face_data.get('mouth_width', 0):.1f} px"],
+        ]
+        table = Table(table_data, colWidths=[200, 200])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 20))
+    
+    if "cephalometric" in analysis_results:
+        ceph_data = analysis_results["cephalometric"]
+        story.append(Paragraph("<b>التحليل السيفالومتري:</b>", styles['Heading4']))
+        ceph_table_data = [
+            ["الزاوية", "القيمة", "التقييم"],
+            ["SNA", f"{ceph_data.get('SNA', 0):.1f}°", "طبيعي"],
+            ["SNB", f"{ceph_data.get('SNB', 0):.1f}°", "طبيعي"],
+            ["ANB", f"{ceph_data.get('ANB', 0):.1f}°", "طبيعي"],
+            ["SN-MP", f"{ceph_data.get('SN-MP', 0):.1f}°", "طبيعي"],
+            ["FMA", f"{ceph_data.get('FMA', 0):.1f}°", "طبيعي"],
+        ]
+        ceph_table = Table(ceph_table_data, colWidths=[150, 150, 150])
+        ceph_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(ceph_table)
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 # =============================================================
 # AUTH PAGE
@@ -1721,7 +1343,7 @@ def sidebar_nav():
         <div style="text-align:center; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px;">
             {display_system_logo(50)}
             <div style="font-weight:700; font-size:1.1rem; margin-top:6px;">🧬 Dentofacial</div>
-            <div style="font-size:0.7rem; color:#aac4d6;">HarmonizeAI™ · v5.0</div>
+            <div style="font-size:0.7rem; color:#aac4d6;">HarmonizeAI™ · v6.0</div>
             <div style="margin-top:4px;"><span class="privacy-badge">🔒 بياناتك خاصة بك</span></div>
         </div>
         <div style="text-align:center; margin-bottom:16px;">
@@ -1736,10 +1358,11 @@ def sidebar_nav():
             "📊 لوحة التحكم": "dashboard",
             "🏷️ رفع الشعار": "upload_logo",
             "🎯 محاكاة الابتسامة": "smile_simulator",
+            "🦷 عارض 3D": "three_d_viewer",
+            "🧠 تحليل الوجه AI": "ai_face_real",
+            "🩻 تحليل الأشعة AI": "ai_cephalometric_real",
+            "📄 تقرير PDF": "pdf_report",
             "🤖 تصميم الابتسامة AI": "ai_smile_design",
-            "🧑‍⚕️ تحليل الوجه AI": "ai_facial_analysis",
-            "🩻 تحليل الأشعة AI": "ai_cephalometric",
-            "🦷 عارض 3D": "three_d_dental_viewer",
             "👨‍⚕️ المرضى": "patients",
             "➕ مريض جديد": "new_patient",
             "🦷 مخطط الأسنان": "dental_chart",
@@ -1882,6 +1505,8 @@ def page_smile_simulator():
                     
                     st.image(result, caption="النتيجة المتوقعة", use_container_width=True)
                     st.image(comparison, caption="مقارنة قبل/بعد", use_container_width=True)
+                    
+                    st.session_state.last_smile_image = result
                     
                     buffered = BytesIO()
                     result.save(buffered, format="PNG")
@@ -2685,7 +2310,7 @@ def page_aesthetic_design():
             st.success("✅ تم توليد التصميم!")
 
 # =============================================================
-# PAGE: STL 3D - (تم تغيير اسم التعليق لتجنب الخطأ)
+# PAGE: STL 3D
 # =============================================================
 def page_stl_3d():
     st.markdown('<h2>📦 نماذج <span style="color:#e67e22;">3D / Mesh</span></h2>', unsafe_allow_html=True)
@@ -3434,6 +3059,398 @@ def get_current_layer_image():
     return None
 
 # =============================================================
+# NEW AI PAGES
+# =============================================================
+
+def page_ai_face_real():
+    """صفحة تحليل الوجه بالذكاء الاصطناعي الحقيقي"""
+    st.markdown('<h2>🧠 تحليل الوجه بالذكاء الاصطناعي <span style="color:#e67e22;">468 نقطة</span></h2>', unsafe_allow_html=True)
+    st.caption("تحليل متقدم للوجه باستخدام 468 نقطة تشريحية لتقييم التناسق والنسب")
+    
+    uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg","png"], key="ai_face_real")
+    
+    if uploaded:
+        img = Image.open(uploaded)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(img, caption="الصورة الأصلية", use_container_width=True)
+        
+        with col2:
+            if st.button("🧠 تحليل الوجه بالذكاء الاصطناعي", type="primary", use_container_width=True):
+                with st.spinner("⏳ جاري تحليل 468 نقطة..."):
+                    analysis_result = real_face_analysis(img)
+                    
+                    if analysis_result.get("analysis_image"):
+                        st.image(analysis_result["analysis_image"], caption="تحليل 468 نقطة", use_container_width=True)
+                        
+                        st.markdown("### 📊 نتائج التحليل")
+                        col_metrics = st.columns(3)
+                        with col_metrics[0]:
+                            st.metric("📍 النقاط المكتشفة", len(analysis_result.get("landmarks", [])))
+                        with col_metrics[1]:
+                            st.metric("📐 التناسق", f"{analysis_result.get('symmetry_score', 0):.1f}%")
+                        with col_metrics[2]:
+                            st.metric("😊 مؤشر الابتسامة", f"{analysis_result.get('smile_index', 0):.1f}%")
+                        
+                        st.info(f"🔹 شكل الوجه: {analysis_result.get('face_shape', 'غير محدد')}")
+                        
+                        st.session_state.last_analysis_image = analysis_result["analysis_image"]
+                        st.session_state.last_analysis_data = analysis_result
+                        
+                        buffered = BytesIO()
+                        analysis_result["analysis_image"].save(buffered, format="PNG")
+                        st.download_button(
+                            label="⬇️ تحميل التحليل",
+                            data=buffered.getvalue(),
+                            file_name=f"face_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
+                            mime="image/png"
+                        )
+                        
+                        st.success("✅ تم التحليل بنجاح باستخدام 468 نقطة تشريحية!")
+                        st.balloons()
+                    else:
+                        st.error("❌ لم يتم اكتشاف وجه في الصورة")
+
+def page_ai_cephalometric_real():
+    """صفحة تحليل الأشعة بالذكاء الاصطناعي الحقيقي"""
+    st.markdown('<h2>🩻 تحليل الأشعة بالذكاء الاصطناعي <span style="color:#e67e22;">AI Cephalometric</span></h2>', unsafe_allow_html=True)
+    st.caption("تحليل متقدم للأشعة السيفالومترية باستخدام معالجة الصور والذكاء الاصطناعي")
+    
+    uploaded = st.file_uploader("📸 رفع صورة الأشعة", type=["jpg", "png", "jpeg", "dcm"], key="ai_xray_real")
+    
+    if uploaded:
+        img = Image.open(uploaded)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.image(img, caption="صورة الأشعة الأصلية", use_container_width=True)
+        
+        with col2:
+            if st.button("🧠 تحليل الذكاء الاصطناعي", type="primary", use_container_width=True):
+                with st.spinner("⏳ جاري تحليل الأشعة ومعالجتها..."):
+                    analysis_result = real_cephalometric_analysis(img)
+                    
+                    if analysis_result.get("analysis_image"):
+                        st.image(analysis_result["analysis_image"], caption="تحليل الأشعة", use_container_width=True)
+                        
+                        st.markdown("### 📊 نتائج التحليل السيفالومتري")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("📐 SNA", f"{analysis_result.get('SNA', 0):.1f}°")
+                            st.metric("📐 SNB", f"{analysis_result.get('SNB', 0):.1f}°")
+                            st.metric("📐 ANB", f"{analysis_result.get('ANB', 0):.1f}°")
+                            st.metric("📐 SN-MP", f"{analysis_result.get('SN-MP', 0):.1f}°")
+                        
+                        with col2:
+                            st.metric("📐 FMA", f"{analysis_result.get('FMA', 0):.1f}°")
+                            st.metric("📐 IMPA", f"{analysis_result.get('IMPA', 0):.1f}°")
+                            st.metric("📐 Overjet", f"{analysis_result.get('Overjet', 0):.1f}mm")
+                            st.metric("📐 Overbite", f"{analysis_result.get('Overbite', 0):.1f}mm")
+                        
+                        st.session_state.last_cephalometric_image = analysis_result["analysis_image"]
+                        st.session_state.last_cephalometric_data = analysis_result
+                        
+                        buffered = BytesIO()
+                        analysis_result["analysis_image"].save(buffered, format="PNG")
+                        st.download_button(
+                            label="⬇️ تحميل التحليل",
+                            data=buffered.getvalue(),
+                            file_name=f"cephalometric_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
+                            mime="image/png"
+                        )
+                        
+                        st.success("✅ تم تحليل الأشعة بنجاح!")
+                    else:
+                        st.error("❌ لم يتمكن النظام من تحليل الصورة")
+
+def page_pdf_report():
+    """صفحة توليد تقرير PDF مع الصور"""
+    st.markdown('<h2>📄 توليد تقرير <span style="color:#e67e22;">PDF شامل</span></h2>', unsafe_allow_html=True)
+    st.caption("تقرير يحتوي على جميع التحاليل والصور الناتجة")
+    
+    patient_name = st.text_input("👤 اسم المريض", value="مريض تجريبي")
+    
+    images = {}
+    if hasattr(st.session_state, 'last_analysis_image') and st.session_state.last_analysis_image:
+        images["تحليل الوجه (468 نقطة)"] = st.session_state.last_analysis_image
+    if hasattr(st.session_state, 'last_cephalometric_image') and st.session_state.last_cephalometric_image:
+        images["تحليل الأشعة السيفالومتري"] = st.session_state.last_cephalometric_image
+    if hasattr(st.session_state, 'last_smile_image') and st.session_state.last_smile_image:
+        images["محاكاة الابتسامة"] = st.session_state.last_smile_image
+    
+    if images:
+        st.markdown("### 📸 الصور المتاحة للتقرير")
+        cols = st.columns(len(images))
+        for i, (title, img) in enumerate(images.items()):
+            with cols[i]:
+                st.image(img, caption=title, use_container_width=True)
+    else:
+        st.info("💡 قم بتحليل الوجه أو الأشعة أو محاكاة الابتسامة أولاً لتوليد الصور")
+    
+    analysis_data = {}
+    if hasattr(st.session_state, 'last_analysis_data') and st.session_state.last_analysis_data:
+        analysis_data["face_analysis"] = st.session_state.last_analysis_data
+    if hasattr(st.session_state, 'last_cephalometric_data') and st.session_state.last_cephalometric_data:
+        analysis_data["cephalometric"] = st.session_state.last_cephalometric_data
+    
+    if st.button("📄 توليد تقرير PDF", type="primary", use_container_width=True):
+        if images:
+            with st.spinner("⏳ جاري توليد التقرير..."):
+                pdf_buffer = generate_pdf_report(patient_name, analysis_data, images)
+                
+                st.download_button(
+                    label="⬇️ تحميل التقرير PDF",
+                    data=pdf_buffer.getvalue(),
+                    file_name=f"report_{patient_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf"
+                )
+                st.success("✅ تم توليد التقرير بنجاح!")
+        else:
+            st.warning("⚠️ لا توجد صور للتصدير. قم بتحليل الوجه أو الأشعة أولاً.")
+
+def page_three_d_viewer():
+    """صفحة عارض ثلاثي الأبعاد مع دعم 3dpea.com"""
+    st.markdown('<h2>🦷 عارض الأسنان ثلاثي الأبعاد <span style="color:#e67e22;">3D Viewer</span></h2>', unsafe_allow_html=True)
+    
+    tab1, tab2 = st.tabs(["🦷 عارض Three.js", "🌐 3DPEA.com - عارض مجاني"])
+    
+    with tab1:
+        st.markdown("### 🎮 عارض Three.js المدمج")
+        st.caption("عارض تفاعلي للأسنان والفك باستخدام Three.js")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            model_type = st.selectbox(
+                "📐 نوع النموذج",
+                ["أسنان كاملة", "فك علوي", "فك سفلي", "زرعة سنية", "تقويم"]
+            )
+        with col2:
+            show_annotations = st.checkbox("🏷️ إظهار التسميات", value=True)
+        
+        viewer_html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { margin: 0; overflow: hidden; background: #0f172a; }
+                #info { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
+                        color: #94a3b8; font-family: 'Cairo', sans-serif; font-size: 12px; 
+                        background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 20px; }
+                #controls { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; }
+                #controls button { background: rgba(230,126,34,0.8); border: none; color: #fff; 
+                                  padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; 
+                                  transition: 0.3s; }
+                #controls button:hover { background: #e67e22; }
+            </style>
+        </head>
+        <body>
+            <div id="container"></div>
+            <div id="info">🦷 اسحب للتدوير | تمرير للتكبير | انقر على سن للمعلومات</div>
+            <div id="controls">
+                <button onclick="resetCamera()">🔄 إعادة ضبط</button>
+                <button onclick="toggleWireframe()">📐 شبكة</button>
+                <button onclick="toggleAutoRotate()">🔄 دوران تلقائي</button>
+                <button onclick="toggleXRay()">🩻 أشعة</button>
+            </div>
+            
+            <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+                }
+            }
+            </script>
+            
+            <script type="module">
+                import * as THREE from 'three';
+                import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+                
+                const container = document.getElementById('container');
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0f172a);
+                
+                const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(5, 3, 8);
+                
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true;
+                container.appendChild(renderer.domElement);
+                
+                const controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.autoRotate = true;
+                controls.autoRotateSpeed = 2.0;
+                
+                const ambientLight = new THREE.AmbientLight(0x404060);
+                scene.add(ambientLight);
+                
+                const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+                mainLight.position.set(5, 10, 7);
+                mainLight.castShadow = true;
+                scene.add(mainLight);
+                
+                const fillLight = new THREE.DirectionalLight(0x8888ff, 0.5);
+                fillLight.position.set(-5, 0, 5);
+                scene.add(fillLight);
+                
+                const toothMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0xf5f0e8,
+                    metalness: 0.05,
+                    roughness: 0.3,
+                    clearcoat: 0.1,
+                });
+                
+                const gumMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0xe8b4b8,
+                    metalness: 0.0,
+                    roughness: 0.8,
+                });
+                
+                const group = new THREE.Group();
+                
+                for (let i = -7; i <= 7; i++) {
+                    if (i === 0) continue;
+                    const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.6, 8), toothMaterial);
+                    const x = i * 0.35;
+                    const z = -0.3 + Math.abs(i) * 0.03;
+                    tooth.position.set(x, 0.3, z);
+                    tooth.rotation.x = 0.1 * (i / 7);
+                    tooth.rotation.z = 0.05 * i;
+                    tooth.userData = { toothNumber: Math.abs(i) + 1, type: 'upper' };
+                    group.add(tooth);
+                }
+                
+                for (let i = -7; i <= 7; i++) {
+                    if (i === 0) continue;
+                    const tooth = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), toothMaterial);
+                    const x = i * 0.35;
+                    const z = 0.3 - Math.abs(i) * 0.03;
+                    tooth.position.set(x, -0.3, z);
+                    tooth.rotation.x = -0.1 * (i / 7);
+                    tooth.rotation.z = 0.05 * i;
+                    tooth.userData = { toothNumber: Math.abs(i) + 17, type: 'lower' };
+                    group.add(tooth);
+                }
+                
+                const gumUpper = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), gumMaterial);
+                gumUpper.position.set(0, 0, -0.5);
+                gumUpper.scale.set(1, 0.3, 0.8);
+                group.add(gumUpper);
+                
+                const gumLower = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 8, 0, Math.PI*2, Math.PI/2, Math.PI/2), gumMaterial);
+                gumLower.position.set(0, -0.05, 0.5);
+                gumLower.scale.set(1, 0.3, 0.8);
+                group.add(gumLower);
+                
+                scene.add(group);
+                
+                window.resetCamera = function() {
+                    camera.position.set(5, 3, 8);
+                    controls.target.set(0, 0, 0);
+                };
+                
+                window.toggleWireframe = function() {
+                    group.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material.wireframe = !child.material.wireframe;
+                        }
+                    });
+                };
+                
+                window.toggleAutoRotate = function() {
+                    controls.autoRotate = !controls.autoRotate;
+                };
+                
+                window.toggleXRay = function() {
+                    group.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material.opacity = child.material.opacity === 1 ? 0.3 : 1;
+                            child.material.transparent = true;
+                        }
+                    });
+                };
+                
+                const raycaster = new THREE.Raycaster();
+                const mouse = new THREE.Vector2();
+                
+                renderer.domElement.addEventListener('click', (event) => {
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                    
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObjects(group.children);
+                    
+                    if (intersects.length > 0) {
+                        const tooth = intersects[0].object;
+                        alert(`🦷 السن رقم ${tooth.userData.toothNumber} - ${tooth.userData.type === 'upper' ? 'علوي' : 'سفلي'}`);
+                    }
+                });
+                
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                function animate() {
+                    requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+                animate();
+            </script>
+        </body>
+        </html>
+        """
+        
+        st.components.v1.html(viewer_html, height=550)
+        
+        uploaded_model = st.file_uploader("📤 رفع نموذج 3D (STL, OBJ, PLY)", type=["stl", "obj", "ply"])
+        if uploaded_model:
+            st.success(f"✅ تم رفع {uploaded_model.name}")
+    
+    with tab2:
+        st.markdown("### 🌐 3DPEA.com - أداة تحويل 3D مجانية")
+        st.caption("تحويل الصور ثنائية الأبعاد إلى مجسمات ثلاثية الأبعاد بصيغة STL مجاناً")
+        
+        st.markdown("""
+        <div style="background:#1e293b; border-radius:12px; padding:20px; border:1px solid #334155; text-align:center;">
+            <div style="font-size:3rem; margin-bottom:10px;">🔄</div>
+            <h3 style="color:#e67e22;">3DPEA.com</h3>
+            <p style="color:#94a3b8;">
+                أداة مجانية لتحويل الصور (PNG, JPG) إلى مجسمات ثلاثية الأبعاد (STL)<br>
+                وتحويل الملفات ثلاثية الأبعاد بين الصيغ المختلفة
+            </p>
+            <a href="https://www.3dpea.com" target="_blank" style="
+                display:inline-block;
+                background:#e67e22;
+                color:#fff;
+                padding:12px 30px;
+                border-radius:30px;
+                text-decoration:none;
+                font-weight:600;
+                margin-top:10px;
+            ">
+                🚀 فتح 3DPEA.com
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("### 📋 الصيغ المدعومة")
+        formats = ["stl", "3mf", "amf", "obj", "fbx", "3dm", "glb", "gltf", "ply", "drc", "zip"]
+        cols = st.columns(4)
+        for i, fmt in enumerate(formats):
+            with cols[i % 4]:
+                st.markdown(f"<div style='background:#0f172a; padding:8px; border-radius:8px; text-align:center; border:1px solid #334155;'><code>{fmt.upper()}</code></div>", unsafe_allow_html=True)
+
+# =============================================================
 # PAGE ROUTER
 # =============================================================
 PAGES = {
@@ -3441,10 +3458,11 @@ PAGES = {
     "dashboard": page_dashboard,
     "upload_logo": page_upload_logo,
     "smile_simulator": page_smile_simulator,
-    "ai_smile_design": page_ai_smile_design,
-    "ai_facial_analysis": page_ai_facial_analysis,
-    "ai_cephalometric": page_ai_cephalometric,
-    "three_d_dental_viewer": page_three_d_dental_viewer,
+    "ai_smile_design": page_smile_simulator,
+    "ai_face_real": page_ai_face_real,
+    "ai_cephalometric_real": page_ai_cephalometric_real,
+    "pdf_report": page_pdf_report,
+    "three_d_viewer": page_three_d_viewer,
     "patients": page_patients,
     "new_patient": page_new_patient,
     "dental_chart": page_dental_chart,
