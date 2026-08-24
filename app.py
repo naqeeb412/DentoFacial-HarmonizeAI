@@ -23,12 +23,11 @@ import sys
 import platform
 
 # =============================================================
-# SYSTEM DETECTION - اكتشاف نظام التشغيل
+# SYSTEM DETECTION - اكتشاف نظام التشغيل (معدل بدون st.runtime)
 # =============================================================
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 IS_MAC = platform.system() == "Darwin"
-IS_MOBILE = st.runtime.scriptrunner.script_runner.RUNTIME == "mobile" if hasattr(st, 'runtime') else False
 
 # =============================================================
 # CONFIG & PAGE SETUP
@@ -762,7 +761,7 @@ def logout():
     st.rerun()
 
 # =============================================================
-# CHECK DEPENDENCIES - التحقق من التبعيات حسب النظام
+# CHECK DEPENDENCIES - التحقق من التبعيات حسب النظام (معدل)
 # =============================================================
 def check_opencv():
     """التحقق من توفر OpenCV"""
@@ -787,23 +786,6 @@ def install_package(package):
         return True
     except:
         return False
-
-# التحقق من التبعيات
-if not check_opencv():
-    st.warning("⚠️ OpenCV غير مثبت. سيتم محاولة التثبيت...")
-    if install_package("opencv-python"):
-        st.success("✅ تم تثبيت OpenCV بنجاح!")
-        st.rerun()
-    else:
-        st.error("❌ فشل تثبيت OpenCV. بعض الميزات لن تعمل.")
-
-if not check_mediapipe():
-    st.warning("⚠️ MediaPipe غير مثبت. سيتم محاولة التثبيت...")
-    if install_package("mediapipe"):
-        st.success("✅ تم تثبيت MediaPipe بنجاح!")
-        st.rerun()
-    else:
-        st.error("❌ فشل تثبيت MediaPipe. بعض الميزات لن تعمل.")
 
 # =============================================================
 # IMAGE PROCESSING FUNCTIONS
@@ -1314,7 +1296,6 @@ def generate_pdf_from_html(html_content):
     محاولة تحويل HTML إلى PDF باستخدام المكتبات المتاحة
     """
     try:
-        # محاولة استخدام weasyprint
         from weasyprint import HTML
         pdf_buffer = BytesIO()
         HTML(string=html_content).write_pdf(pdf_buffer)
@@ -1322,14 +1303,12 @@ def generate_pdf_from_html(html_content):
         return pdf_buffer
     except ImportError:
         try:
-            # محاولة استخدام pdfkit (wkhtmltopdf)
             import pdfkit
             pdf_buffer = BytesIO()
             pdfkit.from_string(html_content, pdf_buffer)
             pdf_buffer.seek(0)
             return pdf_buffer
         except:
-            # إذا لم تتوفر أي مكتبة، نرسل None
             return None
 
 # =============================================================
