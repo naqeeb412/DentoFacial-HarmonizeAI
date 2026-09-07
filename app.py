@@ -47,7 +47,7 @@ def save_global_record(record_id, data):
         db.collection("global_patients").document(record_id).set(data, merge=True)
     return True
 
-# --- 2. إدارة جلسات تسجيل الدخول وإنشاء الحساب ---
+# --- 2. إدارة جلسات تسجيل الدخول المرنة (محدثة لدخول فوري بدون قيود) ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -56,36 +56,24 @@ if "patients_db" not in st.session_state:
     st.session_state.patients_db = {}
 
 def auth_screen():
-    st.markdown('<div class="main-header">🔐 بوابة المصادقة - HarmonizeAI OS</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">تسجيل الدخول أو إنشاء حساب جديد للوصول إلى المنظومة الطبية الذكية</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🔐 بوابة المصادقة الفورية - HarmonizeAI OS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">أدخل أي اسم أو بريد للدخول الفوري إلى المنظومة الطبية الذكية</div>', unsafe_allow_html=True)
     
-    tab_login, tab_register = st.tabs(["تسجيل الدخول", "إنشاء حساب جديد"])
-    
-    with tab_login:
-        l_user = st.text_input("اسم المستخدم أو البريد الإلكتروني", key="l_user")
-        l_pass = st.text_input("كلمة المرور", type="password", key="l_pass")
-        if st.button("تسجيل الدخول"):
-            if l_user.strip():
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown("### الدخول السريع")
+        input_user = st.text_input("اسم المستخدم أو البريد الإلكتروني", value="د. علي النقيب", key="quick_user")
+        if st.button("دخول فوري مباشر"):
+            if input_user.strip():
                 st.session_state.logged_in = True
-                st.session_state.username = l_user
-                st.success(f"مرحباً بك مجدداً، {l_user}!")
+                st.session_state.username = input_user
+                st.success(f"مرحباً بك، {input_user}! يتم الآن توجيهك...")
                 st.rerun()
             else:
-                st.warning("الرجاء إدخال بيانات صحيحة.")
-                
-    with tab_register:
-        r_user = st.text_input("اسم المستخدم الجديد", key="r_user")
-        r_email = st.text_input("البريد الإلكتروني المهني", key="r_email")
-        r_pass = st.text_input("كلمة المرور الجديدة", type="password", key="r_pass")
-        r_clinic = st.text_input("اسم العيادة أو التخصص", value="العيادة التخصصية د. علي النقيب")
-        if st.button("إنشاء الحساب الان"):
-            if r_user.strip() and r_email.strip():
-                st.session_state.logged_in = True
-                st.session_state.username = r_user
-                st.success("تم إنشاء الحساب وتسجيل الدخول بنجاح!")
-                st.rerun()
-            else:
-                st.warning("الرجاء تعبئة الحقول المطلوبة.")
+                st.warning("الرجاء إدخال اسم مستخدم صحيح.")
+    with col2:
+        st.markdown("### معلومات النظام")
+        st.info("تم إلغاء قيود التحقق الصارمة لضمان فتح كافة الأقسام والميزات بشكل فوري وسلس دون أي عوائق في المصادقة.")
 
 if not st.session_state.logged_in:
     auth_screen()
@@ -117,7 +105,7 @@ def generate_pdf(filename, patient_name, details):
     c.drawString(50, 690, f"التقرير التشخيصي: {details}")
     c.save()
 
-# --- القائمة الجانبية الشاملة المحدثة بالذكاء الاصطناعي التفاعلي الكامل ---
+# --- القائمة الجانبية الشاملة المحدثة ---
 st.sidebar.markdown(f"### 🧬 HarmonizeAI™ v3.0")
 st.sidebar.markdown(f"المستخدم: {st.session_state.username}")
 st.sidebar.markdown("المالك: NAQclinixAI | اليمن - إب - ميتم")
