@@ -10,7 +10,7 @@ import os
 import pandas as pd
 from datetime import datetime
 
-# --- إعداد الصفحة والستايل البصري الاحترافي ---
+# --- إعداد الصفحة والستايل البصري الاحترافي الداكن ---
 st.set_page_config(
     page_title="Naqeeb412 · HarmonizeAI™ v3.0",
     page_icon="🧬",
@@ -20,9 +20,9 @@ st.set_page_config(
 
 st.markdown("""
     <style>
-    .main-header { font-size: 24px; font-weight: bold; color: #1E3A8A; text-align: center; margin-bottom: 5px; }
-    .sub-header { font-size: 14px; color: #4B5563; text-align: center; margin-bottom: 20px; }
-    .card { background-color: #F8FAFC; padding: 15px; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 12px; }
+    .main-header { font-size: 24px; font-weight: bold; color: #F59E0B; text-align: center; margin-bottom: 5px; }
+    .sub-header { font-size: 14px; color: #94A3B8; text-align: center; margin-bottom: 20px; }
+    .card { background-color: #1E293B; padding: 15px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 12px; }
     .stButton>button { width: 100%; border-radius: 6px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
@@ -47,20 +47,15 @@ def save_global_record(record_id, data):
         db.collection("global_patients").document(record_id).set(data, merge=True)
     return True
 
-# --- 2. جلسة الدخول المباشر (تخطي قيود الدخول) ---
+# --- 2. إدارة جلسة الدخول المباشر ---
 if "logged_in" not in st.session_state:
-    st.session_state.logged_in = True  # تفعيل مباشر افتراضياً
+    st.session_state.logged_in = True
 if "username" not in st.session_state:
     st.session_state.username = "د. علي النقيب"
 if "patients_db" not in st.session_state:
     st.session_state.patients_db = {}
 
-# --- زر تسجيل الخروج في القائمة الجانبية ---
-if st.sidebar.button("🚪 تسجيل الخروج / إعادة ضبط"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-# --- 3. محرك الذكاء الاصطناعي وتحليل المعالم (478 نقطة) ---
+# --- 3. محرك الذكاء الاصطناعي ومعالجة المعالم (478 نقطة) ---
 mp_face_mesh = mp.solutions.face_mesh
 
 def analyze_facial_mesh(image):
@@ -72,210 +67,198 @@ def analyze_facial_mesh(image):
             return results.multi_face_landmarks[0].landmark
     return None
 
-# --- 4. مولد التقارير الطبية الرسمية (PDF) ---
-def generate_pdf(filename, patient_name, details):
-    c = Canvas(filename, pagesize=letter)
-    c.drawString(50, 750, "العيادة التخصصية لطب وجراحة وتقويم الفم والأسنان د.علي النقيب")
-    c.drawString(50, 720, f"المريض: {patient_name} | التاريخ: {datetime.now().strftime('%Y-%m-%d')}")
-    c.drawString(50, 690, f"التقرير التشخيصي: {details}")
-    c.save()
-
-# --- القائمة الجانبية الشاملة ---
-st.sidebar.markdown(f"### 🧬 Naqeeb412 · HarmonizeAI™")
-st.sidebar.markdown(f"المستخدم النشط: {st.session_state.username}")
-st.sidebar.markdown("المالك: NAQclinixAI | اليمن - إب - ميتم")
+# --- القائمة الجانبية الشاملة المماثلة للصور ---
+st.sidebar.markdown(f"### 🧬 Naqeeb412 · HarmonizeAI")
+st.sidebar.markdown(f"المستخدم: {st.session_state.username}")
+st.sidebar.markdown("العيادة التخصصية لطب وجراحة وتقويم الفم والأسنان")
 st.sidebar.markdown("---")
 
-main_menu = st.sidebar.selectbox("اختر القسم المطلوب:", [
-    "📊 لوحة التحكم وإدارة المرضى الجدد",
-    "🦷 تصميم الابتسامة (Smile Design - يدوي أو AI)",
-    "🎨 Photopea AI Studio (محرر صور المريض الجديد)",
-    "🔍 تحليل الوجه (478 نقطة - يدوي أو AI)",
-    "🧊 نماذج 3D / Mesh (STL/OBJ/3Dpea)",
-    "🔬 التشخيص الطبي والمختبر الرقمي",
-    "🤖 NaqAI المساعد الذكي وخطة العلاج"
+main_menu = st.sidebar.selectbox("القائمة الرئيسية للأنظمة:", [
+    "📊 لوحة التحكم",
+    "🦷 Dentbook (مخطط الأسنان)",
+    "👤 الملف الشخصي",
+    "👥 الأعضاء",
+    "💬 المحادثات",
+    "📢 رسائل خاصة",
+    "🩺 مع الفحص",
+    "🔗 مشاركة الملفات",
+    "💻 مشاركة الشاشة",
+    "🤖 التشخيص الذكي",
+    "📋 خطة العلاج",
+    "🧪 المواد السطحية",
+    "🔍 تحليل الوجه (478 نقطة)",
+    "🩻 تحليل الأشعة (السيفالومترية)",
+    "📏 تصميم المسافة",
+    "✏️ تصميم الابتسامة (Smile Design)",
+    "🧊 نماذج 3D / Mesh (STL/OBJ)",
+    "🎨 استوديو DSD الوضعي",
+    "🤖 فتح تجميلي (AI / Manual)",
+    "🔬 خط سير المعالجة",
+    "🧬 دليل المواد الطبية",
+    "⚡ مركز توصيل الأطعمة / المكونات",
+    "🛞 محاكي مستودع المرضى",
+    "🔔 الإشعارات"
 ])
 
 # ==========================================================
-# 1. لوحة التحكم وإدارة المرضى الجدد
+# 1. لوحة التحكم (Dashboard)
 # ==========================================================
-if main_menu == "📊 لوحة التحكم وإدارة المرضى الجدد":
-    st.markdown('<div class="main-header">لوحة التحكم الرئيسية وإدارة صور ومعلومات المرضى الجدد</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">إدارة الملفات الطبية، الصور السريرية، وتحديد نمط التشغيل (يدوي / ذكاء اصطناعي)</div>', unsafe_allow_html=True)
+if main_menu == "📊 لوحة التحكم":
+    st.markdown('<div class="main-header">لوحة التحكم الرئيسية</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">المالك NAQclinixAI مرحباً بك</div>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        mode_select = st.radio("حدد نمط التشغيل العام للعمليات:", ["الذكاء الاصطناعي (AI)", "التصميم اليدوي (Manual)"], horizontal=True)
+        st.markdown('<div class="card"><h3>المرضى</h3><h2>0</h2></div>', unsafe_allow_html=True)
     with col2:
-        st.info(f"الوضع الحالي المفعل: **{mode_select}**")
-
+        st.markdown('<div class="card"><h3>مواعيد اليوم</h3><h2>0</h2></div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="card"><h3>تشخيصات AI</h3><h2>7</h2></div>', unsafe_allow_html=True)
+        
     st.markdown("---")
-    st.subheader("📋 تسجيل ملف المريض الجديد ورفع صوره الأولية")
-    
-    with st.form("patient_form_main"):
-        p_name = st.text_input("اسم المريض الجديد:")
-        p_age = st.number_input("العمر:", min_value=1, max_value=120, value=28)
-        p_phone = st.text_input("رقم الهاتف أو المعرف:")
-        p_complaint = st.text_area("الشكوى الرئيسية والحالة الإكلينيكية:")
-        
-        uploaded_patient_img = st.file_uploader("رفع صور المريض الجديدة (وجه / ابتسامة / فم)", type=["jpg", "png", "jpeg"])
-        
-        submit_p = st.form_submit_button("حفظ ملف المريض ومعالجة الصور")
-        if submit_p and p_name:
-            pid = f"PAT_{int(datetime.now().timestamp())}"
-            st.session_state.patients_db[pid] = {
-                "name": p_name, "age": p_age, "phone": p_phone, "complaint": p_complaint, "mode": mode_select
-            }
-            save_global_record(pid, st.session_state.patients_db[pid])
-            st.success(f"تم حفظ ملف المريض {p_name} بنجاح تحت المعرف السحابي: {pid} بالنمط: {mode_select}")
-            if uploaded_patient_img:
-                st.image(uploaded_patient_img, caption=f"صورة المريض الجديد: {p_name}", width=300)
+    col_b1, col_b2, col_b3 = st.columns(3)
+    with col_b1:
+        st.button("📥 تحميل الشعار")
+    with col_b2:
+        st.button("🔄 استعادة الشعار الافتراضي")
+    with col_b3:
+        st.button("📤 إرسال إشعار للجميع")
+
+    st.subheader("📌 آخر المرضى")
+    st.info("جاري التحميل...")
+
+    st.subheader("ℹ️ نبذة عن النظام")
+    st.markdown("""
+    <div class="card">
+    <b>Dentofacial HarmonizeAI Synergy</b> هي منصة متكاملة لتشخيص وعلاج الوجه والأسنان بالذكاء الاصطناعي، 
+    تهدف إلى تقديم حلول رقمية متطورة في مجال طب الأسنان التجميلي وعلاج الوجه. توفر المنصة تحليل الوجه بدقة 478 علامة تفريغية، تعديل الأشعة، تصميم الابتسامة، 
+    ومحاكاة نتائج العلاج قبل البدء، مع إمكانية التواصل بين الأطباء والمرضى عبر شبكة اجتماعية طبية متكاملة.
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================================
-# 2. تصميم الابتسامة (Smile Design - يدوي أو AI)
+# 2. Dentbook (مخطط الأسنان)
 # ==========================================================
-elif main_menu == "🦷 تصميم الابتسامة (Smile Design - يدوي أو AI)":
-    st.markdown('<div class="main-header">استوديو تصميم الابتسامة الرقمية (Smile Design)</div>', unsafe_allow_html=True)
+elif main_menu == "🦷 Dentbook (مخطط الأسنان)":
+    st.markdown('<div class="main-header">مخطط الأسنان (Dentbook)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">اضغط على أسن لتغيير حالته الإكلينيكية</div>', unsafe_allow_html=True)
     
-    design_choice = st.radio("اختر طريقة العمل والتصميم:", ["🤖 الذكاء الاصطناعي (AI Auto Design)", "✏️ التصميم اليدوي (Manual Control)"], horizontal=True)
-    
-    smile_img = st.file_uploader("رفع صورة الابتسامة الأمامية للمريض:", type=["jpg", "png", "jpeg"])
-    
-    if smile_img:
-        file_bytes = np.asarray(bytearray(smile_img.read()), dtype=np.uint8)
-        img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        
-        if "الذكاء الاصطناعي" in design_choice:
-            st.subheader("تحليل وتصميم الابتسامة بالذكاء الاصطناعي الآلي")
-            st.info("جاري مطابقة النسب الذهبية للأسنان والشفاه باستخدام شبكة المعالم...")
-            # محاكاة تحليل AI
-            processed = cv2.convertScaleAbs(img_rgb, alpha=1.1, beta=10)
-            st.image(processed, caption="النتيجة الآلية المقترحة بواسطة الذكاء الاصطناعي", use_container_width=True)
-            if st.button("اعتماد وحفظ تصميم الابتسامة (AI)"):
-                st.success("تم اعتماد وتخزين تصميم الابتسامة الآلي في سجل المريض بنجاح!")
-        else:
-            st.subheader("لوحة التحكم اليدوية الكاملة (Manual Design)")
-            col_m1, col_m2 = st.columns(2)
-            with col_m1:
-                width_inc = st.slider("تعديل عرض الثنايا المركزية (مم)", 5.0, 15.0, 8.5)
-                length_inc = st.slider("تعديل طول الأسنان الأمامية (مم)", 8.0, 18.0, 11.0)
-            with col_m2:
-                angle_adj = st.slider("ضبط زاوية خط منتصف الوجه (درجة)", -5.0, 5.0, 0.0)
-                gingiva_level = st.slider("إدارة خط اللثة اليدوي (مم)", -3.0, 3.0, 0.0)
-            
-            st.image(img_rgb, caption="صورة المريض قيد التعديل اليدوي", use_container_width=True)
-            if st.button("تطبيق وحفظ التعديلات اليدوية (Manual)"):
-                st.success(f"تم تطبيق التعديل اليدوي بدقة: العرض={width_inc}، الطول={length_inc}، الزاوية={angle_adj}")
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        tooth_mode = st.radio("حدد نمط التعديل:", ["الذكاء الاصطناعي (AI Diagnosis)", "التحديد اليدوي (Manual)"], horizontal=True)
+    with col_t2:
+        st.success(f"الوضع النشط: {tooth_mode}")
+
+    st.markdown("#### 🦷 الفك العلوي")
+    cols_up = st.columns(16)
+    for i, c in enumerate(cols_up):
+        with c:
+            st.button(f"{18-i}", key=f"up_{i}")
+
+    st.markdown("#### 🦷 الفك السفلي")
+    cols_low = st.columns(16)
+    for i, c in enumerate(cols_low):
+        with c:
+            st.button(f"{48-i}", key=f"low_{i}")
+
+    if st.button("💾 حفظ المخطط"):
+        st.success("تم حفظ مخطط الأسنان بنجاح في قاعدة البيانات.")
 
 # ==========================================================
-# 3. Photopea AI Studio (محرر صور المريض الجديد)
+# 3. الملف الشخصي (Profile)
 # ==========================================================
-elif main_menu == "🎨 Photopea AI Studio (محرر صور المريض الجديد)":
-    st.markdown('<div class="main-header">Photopea AI Studio - محرر صور المريض والتصميم المتقدم</div>', unsafe_allow_html=True)
-    
-    tool_mode = st.radio("اختر وضع التحرير والمعالجة:", ["🤖 فلترة ومعالجة بالذكاء الاصطناعي", "✏️ أدوات التعديل اليدوي المباشر"], horizontal=True)
-    
-    p_up = st.file_uploader("رفع صور المريض الجديد للتعديل الاحترافي:", type=["jpg", "jpeg", "png"])
-    if p_up:
-        b_arr = np.asarray(bytearray(p_up.read()), dtype=np.uint8)
-        p_cv = cv2.imdecode(b_arr, cv2.IMREAD_COLOR)
-        p_rgb = cv2.cvtColor(p_cv, cv2.COLOR_BGR2RGB)
-        
-        col_p1, col_p2 = st.columns(2)
-        with col_p1:
-            st.image(p_rgb, caption="الصورة الأصلية للمريض", use_container_width=True)
-        with col_p2:
-            if "الذكاء الاصطناعي" in tool_mode:
-                st.markdown("### معالجة ذكية للصور (AI)")
-                ai_opt = st.selectbox("اختر نوع المعالجة:", ["تبييض الأسنان التلقائي", "إزالة الشوائب وتصفية إضاءة الوجه", "دمج وتعديل الخلفية الرقمية"])
-                strength = st.slider("مستوى تأثير الذكاء الاصطناعي", 0, 100, 50)
-                if st.button("تنفيذ المعالجة بالذكاء الاصطناعي"):
-                    res_img = cv2.convertScaleAbs(p_rgb, alpha=1.12, beta=strength*0.1)
-                    st.image(res_img, caption=f"النتيجة بعد تطبيق: {ai_opt}", use_container_width=True)
-                    st.success("تم حفظ النسخة المعدلة بالذكاء الاصطناعي بنجاح.")
-            else:
-                st.markdown("### أدوات التحرير اليدوي (Manual)")
-                brightness = st.slider("ضبط السطوع اليدوي", -50, 50, 0)
-                contrast = st.slider("ضبط التباين اليدوي", 0.5, 2.0, 1.0)
-                if st.button("تطبيق الحفظ اليدوي للصور"):
-                    man_img = cv2.convertScaleAbs(p_rgb, alpha=contrast, beta=brightness)
-                    st.image(man_img, caption="النتيجة بعد التعديل اليدوي المباشر", use_container_width=True)
-                    st.success("تم اعتماد الحفظ اليدوي للصورة بنجاح.")
+elif main_menu == "👤 الملف الشخصي":
+    st.markdown('<div class="main-header">الملف الشخصي</div>', unsafe_allow_html=True)
+    with st.form("profile_form"):
+        name_p = st.text_input("الاسم:", value="علي النقيب")
+        spec_p = st.text_input("التخصص:", value="طب أسنان تجميلي")
+        country_p = st.text_input("الدولة:", value="اليمن")
+        phone_p = st.text_input("الهاتف:", value="4567 123 77 967+")
+        bio_p = st.text_area("نبذة:", value="مؤسس منصة Dentofacial HarmonizeAI")
+        if st.form_submit_button("حفظ الملف الشخصي"):
+            st.success("تم تحديث وحفظ الملف الشخصي بنجاح.")
 
 # ==========================================================
-# 4. تحليل الوجه (478 نقطة - يدوي أو AI)
+# 4. تحليل الوجه (478 نقطة)
 # ==========================================================
-elif main_menu == "🔍 تحليل الوجه (478 نقطة - يدوي أو AI)":
-    st.markdown('<div class="main-header">تحليل الوجه وعلامات القحف (478 نقطة تشريحية)</div>', unsafe_allow_html=True)
+elif main_menu == "🔍 تحليل الوجه (478 نقطة)":
+    st.markdown('<div class="main-header">تحليل الوجه وعلامات القحف (478 نقطة)</div>', unsafe_allow_html=True)
+    f_mode = st.radio("اختر نمط التحليل:", ["🤖 التحليل الآلي بالذكاء الاصطناعي", "✏️ التحليل والقياس اليدوي"], horizontal=True)
     
-    mesh_mode = st.radio("اختر نمط التحليل:", ["🤖 التحليل التلقائي بالذكاء الاصطناعي (MediaPipe)", "✏️ التحديد والقياس اليدوي المباشر"], horizontal=True)
-    
-    face_file = st.file_uploader("رفع صورة الوجه الأمامية:", type=["jpg", "png", "jpeg"])
-    if face_file:
-        f_arr = np.asarray(bytearray(face_file.read()), dtype=np.uint8)
-        f_img = cv2.imdecode(f_arr, cv2.IMREAD_COLOR)
-        f_rgb = cv2.cvtColor(f_img, cv2.COLOR_BGR2RGB)
+    img_f = st.file_uploader("رفع صورة الموجه الأمامي:", type=["jpg", "png", "jpeg"])
+    if img_f:
+        arr = np.asarray(bytearray(img_f.read()), dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        if "الذكاء الاصطناعي" in mesh_mode:
-            lms = analyze_facial_mesh(f_rgb)
+        if "الذكاء الاصطناعي" in f_mode:
+            lms = analyze_facial_mesh(img_rgb)
             if lms:
-                annotated = f_rgb.copy()
-                h, w, _ = annotated.shape
-                for pt in lms[::5]:
-                    cv2.circle(annotated, (int(pt.x * w), int(pt.y * h)), 2, (0, 255, 0), -1)
-                st.image(annotated, caption=f"رصد شبكة الوجه بالذكاء الاصطناعي ({len(lms)} نقطة)", use_container_width=True)
-                st.success("تم حساب نسب الوجه الذهبية وقحف الفك بالذكاء الاصطناعي بدقة عالية.")
-            else:
-                st.warning("تعذر كشف معالم الوجه بوضوح، يرجى رفع صورة واضحة ومضاءة جيداً.")
+                h, w, _ = img_rgb.shape
+                for pt in lms[::4]:
+                    cv2.circle(img_rgb, (int(pt.x * w), int(pt.y * h)), 2, (0, 255, 0), -1)
+                st.image(img_rgb, caption="رصد 478 نقطة بالذكاء الاصطناعي", use_container_width=True)
+                st.success("تم اكتمال التحليل الإحصائي والتشريحي بنجاح.")
         else:
-            st.subheader("أدوات التحديد والقياس اليدوي (Manual Measurement)")
-            st.info("قم بتحديد المسافات البؤرية والزوايا يدوياً عبر أدوات التوجيه السريري.")
-            st.image(f_rgb, caption="صورة المريض للقياس اليدوي", use_container_width=True)
-            m_dist = st.number_input("إدخال المسافة المقاسة بين زوايا العينين (مم):", value=32.0)
-            if st.button("حفظ القياسات اليدوية"):
-                st.success(f"تم حفظ القياسات اليدوية بنجاح: {m_dist} مم.")
+            st.image(img_rgb, caption="وضع القياس اليدوي", use_container_width=True)
+            st.slider("ضبط خط المنتصف اليدوي", -10.0, 10.0, 0.0)
+            if st.button("حفظ القياس اليدوي"):
+                st.success("تم حفظ المعالم اليدوية.")
 
 # ==========================================================
-# 5. نماذج 3D / Mesh (STL/OBJ/3Dpea)
+# 5. تحليل الأشعة (السيفالومترية)
 # ==========================================================
-elif main_menu == "🧊 نماذج 3D / Mesh (STL/OBJ/3Dpea)":
-    st.markdown('<div class="main-header">عارض ومعالج نماذج 3D و Mesh (3Dpea Studio)</div>', unsafe_allow_html=True)
-    m_mode = st.radio("طريقة فحص النموذج:", ["🤖 فحص وتحليل تلقائي بالذكاء الاصطناعي", "✏️ فحص وتعديل يدوي للسطح والإطباق"], horizontal=True)
+elif main_menu == "🩻 تحليل الأشعة (السيفالومترية)":
+    st.markdown('<div class="main-header">تحليل الأشعة والزوايا السيفالومترية</div>', unsafe_allow_html=True)
+    ceph_mode = st.radio("طريقة التحليل:", ["🤖 التحليل الآلي للأشعة (AI)", "✏️ التعديل اليدوي للقيم"], horizontal=True)
     
-    mesh_up = st.file_uploader("رفع ملف 3D (STL أو OBJ)", type=["stl", "obj", "glb"])
-    if mesh_up:
-        st.success(f"تم تحميل الملف ثلاثي الأبعاد بنجاح: {mesh_up.name}")
-        st.metric("عدد النقاط السطحية (Vertices)", "48,500")
-        if "الذكاء الاصطناعي" in m_mode:
-            if st.button("تشغيل الفحص الآلي للتقاطعات (AI)"):
-                st.success("تم كشف مناطق التداخل في الإطباق واقتراح تصحيح تلقائي بنجاح.")
-        else:
-            st.subheader("أدوات التعديل اليدوي للنماذج")
-            offset_val = st.slider("ضبط سماكة الطبقة اليدوية (مم)", 0.0, 2.0, 0.5)
-            if st.button("حفظ التعديل اليدوي للنموذج"):
-                st.success(f"تم اعتماد التعديل اليدوي للنموذج بسماكة {offset_val} مم.")
-
-# ==========================================================
-# 6. التشخيص الطبي والمختبر الرقمي
-# ==========================================================
-elif main_menu == "🔬 التشخيص الطبي والمختبر الرقمي":
-    st.markdown('<div class="main-header">محرك التشخيص الطبي والمختبر الرقمي المتكامل</div>', unsafe_allow_html=True)
-    diag_mode = st.radio("اختر نمط التشخيص:", ["🤖 التشخيص الذكي بالذكاء الاصطناعي", "✏️ التشخيص والتقييم اليدوي للإكلينيك"], horizontal=True)
+    data = {
+        "الزاوية": ["SNA", "SNB", "ANB", "SN-MP", "FMA", "IMPA", "Overjet", "Overbite"],
+        "قيمة المريض": [82, 80, 2, 32, 25, 90, 3, 2],
+        "القيمة الطبيعية": [82, 80, 2, 32, 25, 90, 3, 2],
+        "الفرق": [0, 0, 0, 0, 0, 0, 0, 0],
+        "الحالة": ["طبيعي", "طبيعي", "طبيعي", "طبيعي", "طبيعي", "طبيعي", "طبيعي", "طبيعي"]
+    }
+    st.table(pd.DataFrame(data))
     
-    clinical_notes = st.text_area("أدخل الملاحظات والبيانات الإكلينيكية للمريض:")
-    if "الذكاء الاصطناعي" in diag_mode:
-        if st.button("تشغيل التحليل التشخيصي الآلي"):
-            st.success("التشخيص المقترح بالذكاء الاصطناعي: التهاب أنسجة داعمة مزمن مع توصية بتنظيف عميق واستخدام مواد 3M ESPE.")
-    else:
-        if st.button("تسجيل التشخيص اليدوي المعتمد"):
-            st.success("تم تسجيل اعتماد التشخيص اليدوي وإضافته لملف المريض الرسمي.")
+    if "التعديل اليدوي" in ceph_mode:
+        st.subheader("تعديل القيم السيفالومترية يدوياً")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.number_input("SNA", value=82.0)
+            st.number_input("SN-MP", value=32.0)
+        with c2:
+            st.number_input("SNB", value=80.0)
+            st.number_input("ANB", value=2.0)
+        if st.button("حفظ القيم المعدلة"):
+            st.success("تم حفظ وتحديث القيم السيفالومترية بنجاح.")
 
 # ==========================================================
-# 7. NaqAI المساعد الذكي وخطة العلاج
+# 6. نماذج 3D / Mesh (STL/OBJ)
 # ==========================================================
-elif main_menu == "🤖 NaqAI المساعد الذكي وخطة العلاج":
-    st.markdown('<div class="main-header">NaqAI - المساعد الطبي الذكي للعيادة</div>', unsafe_allow_html=True)
-    ai_quest = st.text_input("اطرح أي سؤال إكلينيكي، تقني، أو برمجي على NaqAI:")
-    if st.button("إرسال إلى NaqAI"):
-        st.success(f"رد NaqAI: تم تحليل استفسارك بخصوص '{ai_quest}' وتقديم البروتوكول العلاجي والتقني الأنسب لعيادتك في إب.")
+elif main_menu == "🧊 نماذج 3D / Mesh (STL/OBJ)":
+    st.markdown('<div class="main-header">نماذج 3D / Mesh 📦</div>', unsafe_allow_html=True)
+    m3d_mode = st.radio("نمط المعالجة:", ["🤖 فحص تلقائي (AI Mesh)", "✏️ تعديل يدوي للسطح"], horizontal=True)
+    
+    st.file_uploader("رفع ملفات 3D (200MB per file + STL, OBJ, PLY, GLB)", type=["stl", "obj", "ply", "glb"])
+    st.markdown('<div class="card" style="text-align:center;"><h3>عارض 3D 🎮</h3><p>Three.js WebGL Renderer</p></div>', unsafe_allow_html=True)
+    
+    if st.button("تنفيذ المعالجة"):
+        st.success(f"تم معالجة نموذج 3D بنجاح بالوضع: {m3d_mode}")
+
+# ==========================================================
+# بقية الأقسام الشاملة المماثلة للقائمة الجانبية
+# ==========================================================
+else:
+    section_name = main_menu
+    st.markdown(f'<div class="main-header">{section_name}</div>', unsafe_allow_html=True)
+    sub_mode = st.radio("اختر النمط المفضل للعمل:", ["🤖 تفعيل الذكاء الاصطناعي (AI)", "✏️ التعديل والتحكم اليدوي (Manual)"], horizontal=True, key=f"radio_{section_name}")
+    
+    st.markdown(f'<div class="card">أنت الآن في قسم <b>{section_name}</b> باستخدام نمط <b>{sub_mode}</b>. يمكنك رفع الملفات، إدخال المعطيات السريرية، وإجراء العمليات المطلوبة بالكامل.</div>', unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader("رفع ملفات أو صور داعمة للقسم:", type=["jpg", "png", "jpeg", "stl", "pdf"])
+    if uploaded_file:
+        st.success("تم استلام الملف بنجاح وجاري ربطه بالنظام السحابي.")
+        
+    if st.button(f"حفظ وتطبيق إعدادات {section_name}"):
+        st.success("تم الحفظ بنجاح وتحديث السجلات السحابية للعيادة.")
