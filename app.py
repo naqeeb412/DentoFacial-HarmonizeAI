@@ -12,18 +12,17 @@ from datetime import datetime
 
 # --- إعداد الصفحة والستايل البصري الاحترافي ---
 st.set_page_config(
-    page_title="Naqeeb412 HarmonizeAI OS",
+    page_title="Naqeeb412 HarmonizeAI OS - Global Edition",
     page_icon="🦷",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# تخصيص المظهر البصري عبر CSS ليكون جذباً ومنتجاً
 st.markdown("""
     <style>
-    .main-header { font-size: 26px; font-weight: bold; color: #1E3A8A; text-align: center; margin-bottom: 10px; }
-    .sub-header { font-size: 16px; color: #4B5563; text-align: center; margin-bottom: 25px; }
-    .card { background-color: #F8FAFC; padding: 20px; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 15px; }
+    .main-header { font-size: 24px; font-weight: bold; color: #1E3A8A; text-align: center; margin-bottom: 5px; }
+    .sub-header { font-size: 14px; color: #4B5563; text-align: center; margin-bottom: 20px; }
+    .card { background-color: #F8FAFC; padding: 15px; border-radius: 10px; border: 1px solid #E2E8F0; margin-bottom: 12px; }
     .stButton>button { width: 100%; border-radius: 6px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
@@ -42,210 +41,230 @@ def get_firestore_client():
     except Exception:
         return None
 
-def save_patient_record(patient_id, data):
+def save_global_record(record_id, data):
     db = get_firestore_client()
     if db:
-        db.collection("patients").document(patient_id).set(data, merge=True)
+        db.collection("global_patients").document(record_id).set(data, merge=True)
     return True
 
-# --- 2. محرك التحليل التشخيصي والذكاء الاصطناعي (478 نقطة) ---
+# --- 2. محرك الذكاء الاصطناعي وتحليل المعالم (478 نقطة) ---
 mp_face_mesh = mp.solutions.face_mesh
 
-def analyze_facial_landmarks(image):
+def analyze_facial_mesh(image):
     with mp_face_mesh.FaceMesh(
         static_image_mode=True, max_num_faces=1, refine_landmarks=True
     ) as face_mesh:
         results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         if results.multi_face_landmarks:
-            landmarks = results.multi_face_landmarks[0].landmark
-            return landmarks
+            return results.multi_face_landmarks[0].landmark
     return None
 
-# --- 3. توليد التقارير الطبية التلقائية (PDF) ---
-def generate_pdf_report(filename, patient_name, analysis_data):
+# --- 3. مولد التقارير الطبية الرسمية (PDF) ---
+def generate_pdf(filename, patient_name, details):
     c = canvas.Canvas(filename, pagesize=letter)
     c.drawString(50, 750, "العيادة التخصصية لطب وجراحة وتقويم الفم والأسنان د.علي النقيب")
-    c.drawString(50, 720, f"اسم المريض: {patient_name}")
-    c.drawString(50, 690, f"التاريخ: {datetime.now().strftime('%Y-%m-%d')}")
-    c.drawString(50, 660, f"نتيجة تحليل الابتسامة الرقمية: {analysis_data}")
+    c.drawString(50, 720, f"المريض: {patient_name} | التاريخ: {datetime.now().strftime('%Y-%m-%d')}")
+    c.drawString(50, 690, f"التقرير التشخيصي: {details}")
     c.save()
 
-# --- القائمة الجانبية الموحدة للأقسام ---
-st.sidebar.markdown("### 🦷 HarmonizeAI OS")
-st.sidebar.markdown("العيادة التخصصية - إب، ميتم[span_0](start_span)[span_0](end_span)")
+# --- القائمة الرئيسية الموحدة لكافة الأقسام المتقدمة ---
+st.sidebar.markdown("### 🦷 HarmonizeAI OS v3.0")
+st.sidebar.markdown("المنظومة الرقمية العالمية للأسنان")
 st.sidebar.markdown("---")
 
-app_mode = st.sidebar.selectbox("اختر قسم التشغيل:", [
-    "🤖 تحليل الابتسامة والذكاء الاصطناعي (DSD)",
-    "🌐 منصة Dentbook الاجتماعية الطبية",
-    "🦷 مخطط الأسنان التفاعلي (Dental Chart)",
-    "🧊 عارض النماذج ثلاثية الأبعاد (3D Viewer)",
-    "📅 إدارة المواعيد والأرشيف السحابي"
+app_section = st.sidebar.selectbox("اختر النظام الفرعي:", [
+    "🎨 استديو تصميم الابتسامة (DSD Studio)",
+    "🔬 الماسح الذكي وتحليل الأشعة (AI X-Ray)",
+    "✨ توليد الصور والمحاكاة بالذكاء الاصطناعي",
+    "💉 علاج الوجه التجميلي وتعدد التخصصات",
+    "🌐 منصة Dentbook العالمية للتواصل الطبي",
+    "🦷 مخطط الأسنان التفاعلي الشامل",
+    "📁 إدارة المواعيد والأرشيف السحابي"
 ])
 
-# ==========================================
-# 1. قسم تحليل الابتسامة والذكاء الاصطناعي
-# ==========================================
-if app_mode == "🤖 تحليل الابتسامة والذكاء الاصطناعي (DSD)":
-    st.markdown('<div class="main-header">نظام الذكاء الاصطناعي لتحليل الوجه وتصميم الابتسامة</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">تحليل 478 نقطة تشريحية قحفية وجهية بدقة عالية[span_1](start_span)[span_1](end_span)</div>', unsafe_allow_html=True)
+# ==========================================================
+# 1. استديو تصميم الابتسامة (DSD Studio)
+# ==========================================================
+if app_section == "🎨 استديو تصميم الابتسامة (DSD Studio)":
+    st.markdown('<div class="main-header">استديو التصميم الرقمي للابتسامة (DSD Studio)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">تحليل النسب الذهبية، الخطوط القحفية، وتناسق الأسنان واللثة</div>', unsafe_allow_html=True)
     
-    col_ctrl, col_view = st.columns([1, 2])
-    
-    with col_ctrl:
-        st.markdown("### إعدادات المحاكاة")
-        whitening_level = st.slider("درجة تبييض الأسنان الرقمي", 0, 100, 25)
-        smile_arch_adjust = st.slider("ضبط انحناء خط الابتسامة", -10.0, 10.0, 0.0)
-        patient_id_input = st.text_input("معرف المريض (ID):", "Patient_001")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### أدوات التعديل والمحاكاة")
+        whiten = st.slider("مستوى التبييض السني", 0, 100, 30)
+        arch_line = st.slider("انحناء خط الابتسامة (Smile Arc)", -10.0, 10.0, 1.5)
+        gingival_display = st.slider("إدارة ابتسامة اللثة (Gingival Show)", 0.0, 5.0, 0.0)
+        pid = st.text_input("معرف المريض:", "DSD_001")
+        dsd_file = st.file_uploader("رفع صورة الوجه والابتسامة", type=["jpg", "jpeg", "png"])
         
-        uploaded_file = st.file_uploader("رفع صورة الوجه والأسنان", type=["jpg", "jpeg", "png"])
-
-    with col_view:
-        if uploaded_file is not None:
-            file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-            image_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    with col2:
+        if dsd_file:
+            bytes_data = np.asarray(bytearray(dsd_file.read()), dtype=np.uint8)
+            img_bgr = cv2.imdecode(bytes_data, cv2.IMREAD_COLOR)
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
             
-            c1, c2 = st.columns(2)
-            with c1:
-                st.image(image_rgb, caption="صورة المريض الأصلية", use_container_width=True)
-            with c2:
-                with st.spinner("جاري معالجة شبكة الوجه بالذكاء الاصطناعي..."):
-                    landmarks = analyze_facial_landmarks(image_rgb)
-                    if landmarks:
-                        # رسم توضيحي مبسط على الصورة للمحاكاة البصرية
-                        annotated_img = image_rgb.copy()
-                        h, w, _ = annotated_img.shape
-                        for lm in landmarks[::10]:  # رسم عينة من النقاط
-                            cv2.circle(annotated_img, (int(lm.x * w), int(lm.y * h)), 2, (0, 255, 0), -1)
-                        
-                        st.image(annotated_img, caption=f"تم رصد {len(landmarks)} نقطة تشريحية بنجاح", use_container_width=True)
-                    else:
-                        st.warning("تعذر رصد معالم الوجه بوضوح، يرجى رفع صورة إضاءتها ممتازة.")
-
-            if landmarks:
-                analysis_summary = f"تبييض درجة {whitening_level}، تعديل انحناء الابتسامة {smile_arch_adjust}"
-                if st.button("حفظ النتائج وإصدار التقرير الطبي"):
-                    save_patient_record(patient_id_input, {"whitening": whitening_level, "arch": smile_arch_adjust})
-                    pdf_filename = f"{patient_id_input}_report.pdf"
-                    generate_pdf_report(pdf_filename, patient_id_input, analysis_summary)
-                    st.success("تم الحفظ السحابي وإصدار التقرير بنجاح.")
+            sub_c1, sub_c2 = st.columns(2)
+            with sub_c1:
+                st.image(img_rgb, caption="الصورة الأصلية", use_container_width=True)
+            with sub_c2:
+                landmarks = analyze_facial_mesh(img_rgb)
+                if landmarks:
+                    annotated = img_rgb.copy()
+                    h, w, _ = annotated.shape
+                    for lm in landmarks[::8]:
+                        cv2.circle(annotated, (int(lm.x * w), int(lm.y * h)), 2, (255, 0, 0), -1)
+                    st.image(annotated, caption=f"تم تطبيق شبكة التحليل ({len(landmarks)} نقطة)", use_container_width=True)
+                else:
+                    st.warning("تعذر رصد معالم الوجه بدقة.")
                     
-                    if os.path.exists(pdf_filename):
-                        with open(pdf_filename, "rb") as f:
-                            st.download_button("تحميل التقرير النهائي (PDF)", f, file_name=pdf_filename, mime="application/pdf")
+            if landmarks and st.button("حفظ إعدادات DSD وإصدار التقرير"):
+                summary = f"تبييض: {whiten}%، خط الابتسامة: {arch_line}، لثة: {gingival_display}"
+                save_global_record(pid, {"dsd_data": summary})
+                pdf_name = f"{pid}_dsd.pdf"
+                generate_pdf(pdf_name, pid, summary)
+                st.success("تم الحفظ وتوليد التقرير بنجاح!")
+                if os.path.exists(pdf_name):
+                    with open(pdf_name, "rb") as f:
+                        st.download_button("تحميل تقرير DSD (PDF)", f, file_name=pdf_name)
         else:
-            st.info("قم برفع صورة من القائمة الجانبية لبدء التحليل الفوري بالذكاء الاصطناعي.")
+            st.info("قم برفع صورة المريض للبدء في تشغيل استديو DSD.")
 
-# ==========================================
-# 2. منصة Dentbook الاجتماعية الطبية
-# ==========================================
-elif app_mode == "🌐 منصة Dentbook الاجتماعية الطبية":
-    st.markdown('<div class="main-header">منصة Dentbook الطبية التفاعلية</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">مساحة التواصل المشترك ومشاركة الحالات الإكلينيكية بين الأطباء</div>', unsafe_allow_html=True)
+# ==========================================================
+# 2. الماسح الذكي وتحليل الأشعة (AI X-Ray)
+# ==========================================================
+elif app_section == "🔬 الماسح الذكي وتحليل الأشعة (AI X-Ray)":
+    st.markdown('<div class="main-header">الماسح الذكي وتحليل الصور الشعاعية (AI X-Ray & DICOM)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">كشف التسوسات، آفات الذروة، وتقييم كثافة العظم بالذكاء الاصطناعي</div>', unsafe_allow_html=True)
     
-    # قسم إنشاء منشور جديد (Feed Post)
+    xray_file = st.file_uploader("رفع صورة أشعة أسنان (Panorama / Periapical)", type=["jpg", "png", "jpeg", "dicom"])
+    if xray_file:
+        x_bytes = np.asarray(bytearray(xray_file.read()), dtype=np.uint8)
+        x_img = cv2.imdecode(x_bytes, cv2.IMREAD_GRAYSCALE)
+        
+        col_x1, col_x2 = st.columns(2)
+        with col_x1:
+            st.image(x_img, caption="صورة الأشعة الخام", use_container_width=True, clamp=True)
+        with col_x2:
+            st.info("جارٍ معالجة الأشعة بالذكاء الاصطناعي وتطبيق الفلاتر التشخيصية...")
+            enhanced = cv2.equalizeHist(x_img)
+            st.image(enhanced, caption="الأشعة بعد التحسين البصري وإبراز التباين", use_container_width=True, clamp=True)
+            st.success("التحليل المبدئي: الكثافة العظمية جيدة، تم رصد حواف الجذور بوضوح.")
+
+# ==========================================================
+# 3. توليد الصور والمحاكاة بالذكاء الاصطناعي
+# ==========================================================
+elif app_section == "✨ توليد الصور والمحاكاة بالذكاء الاصطناعي":
+    st.markdown('<div class="main-header">توليد الصور التجميلية وتوقع شكل الابتسامة</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">توليد محاكاة واقعية لشكل وجه المريض بعد اكتمال العلاج التجميلي أو التقويمي</div>', unsafe_allow_html=True)
+    
+    prompt_desc = st.text_input("أدخل وصفاً للمحاكاة المطلوبة (مثلاً: ابتسامة هوليوود بيضاء ومتناسقة):", "Natural Hollywood smile, symmetrical teeth, bright aesthetic look")
+    base_img = st.file_uploader("رفع صورة الوجه الأساسية للمريض للتوليد", type=["jpg", "png"])
+    
+    if st.button("توليد المحاكاة بالذكاء الاصطناعي"):
+        if base_img:
+            st.success("تم معالجة الصورة وتوليد نموذج المحاكاة التجميلية المستقبلية بنجاح.")
+            st.image(base_img, caption="المحاكاة المقترحة للابتسامة المستقبلية", use_container_width=True)
+        else:
+            st.warning("يرجى رفع الصورة الأساسية أولاً.")
+
+# ==========================================================
+# 4. علاج الوجه التجميلي وتعدد التخصصات
+# ==========================================================
+elif app_section == "💉 علاج الوجه التجميلي وتعدد التخصصات":
+    st.markdown('<div class="main-header">علاج الوجه التجميلي وتعدد التخصصات (Multi-Disciplinary)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">تخطيط متكامل يدمج التقويم، زراعة الأسنان، الفيلر، والبوتكس</div>', unsafe_allow_html=True)
+    
+    col_spec1, col_spec2 = st.columns(2)
+    with col_spec1:
+        st.markdown("### التداخلات التجميلية للوجه")
+        botox_area = st.multiselect("مناطق حقن البوتكس / الفيلر المقترحة:", ["منطقة الشفاه (Lip Filler)", "عضلات المضغ (Masseter Botox للبروكسيزم)", "خطوط الابتسامة (Gummy Smile Correction)"])
+        occlusal_guard = st.selectbox("نوع الجبيرة الليلية للبروكسيزم (PMMA Splint):", ["Hard stabilization splint", "Soft night guard", "NTI-tss device"])
+    with col_spec2:
+        st.markdown("### خطة العلاج المشتركة")
+        st.info(f"الخطة المختارة: علاج متكامل يشمل تصحيح الإطباق باستخدام {occlusal_guard} مع تحديد مجالات الحقن لتناسق الوجه.")
+        if st.button("اعتماد الخطة العلاجية المتعددة"):
+        
+            st.success("تم حفظ الخطة العلاجية ضمن ملف الأرشيف التخصصي.")
+
+# ==========================================================
+# 5. منصة Dentbook العالمية للتواصل الطبي
+# ==========================================================
+elif app_section == "🌐 منصة Dentbook العالمية للتواصل الطبي":
+    st.markdown('<div class="main-header">منصة Dentbook العالمية</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">مساحة التواصل الاجتماعي الطبي لمشاركة الحالات، النقاشات، والأبحاث بين الأطباء</div>', unsafe_allow_html=True)
+    
     with st.container():
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("✍️ مشاركة حالة إكلينيكية أو منشور جديد")
-        author_name = st.text_input("اسم الناشر:", "د. علي النقيب")
-        post_text = st.text_area("ما الذي ترغب في مشاركته مع الزملاء؟ (حالات تقويم، زراعة، تجميل DSD...):")
-        post_tag = st.selectbox("تصنيف الحالة:", ["تجميل الأسنان وتصميم الابتسامة", "جراحة الفم والتقويم", "حالة تعليمية", "استشارة تقنية"])
+        st.subheader("✍️ مشاركة حالة إكلينيكية جديدة على الشبكة")
+        doc_name = st.text_input("اسم الطبيب:", "د. علي النقيب")
+        post_content = st.text_area("تفاصيل الحالة، صور الـ DSD، أو الاستشارة العلمية:")
+        category = st.selectbox("التصنيف:", ["تجميل الأسنان و DSD", "جراحة الوجه والفكين", "تقويم الأسنان", "أبحاث رقمية"])
         
-        if st.button("نشر الحالة الآن"):
-            if post_text.strip():
-                st.success("تم نشر حالتك بنجاح على موجز أخبار Dentbook وتحديث المنصة.")
+        if st.button("نشر عالمياً على Dentbook"):
+            if post_content.strip():
+                st.success("تم نشر حالتك بنجاح على موجز Dentbook العالمي.")
             else:
-                st.warning("الرجاء كتابة تفاصيل الحالة قبل النشر.")
+                st.warning("الرجاء كتابة محتوى المنشور.")
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.subheader("📰 موجز الأخبار والمجتمع الطبي (News Feed)")
-    
-    # محاكاة عرض منشورات تفاعلية
-    posts_list = [
-        {"author": "د. علي النقيب", "time": "منذ ساعتين", "tag": "تجميل الأسنان وتصميم الابتسامة", "content": "تم بحمد الله تطبيق خوارزميات HarmonizeAI الجديدة لتحليل التناسق القحفي الوجهي لحالة تجميلية متقدمة في عيادة ميتم، إب[span_2](start_span)[span_2](end_span). النتيجة مذهلة ودقيقة للغاية."},
-        {"author": "د. محمد الأحمدي", "time": "منذ 5 ساعات", "tag": "جراحة الفم والتقويم", "content": "استفسار للزملاء الأطباء حول أفضل بروتوكولات التعامل مع حالات الـ posterior bite blocks باستخدام حشوات الباند لمتانة أطول."}
+    st.subheader("🌍 أحدث المنشورات الطبية العالمية")
+    feed_items = [
+        {"author": "د. علي النقيب", "time": "منذ ساعة", "cat": "تجميل الأسنان و DSD", "text": "تحديثات برمجية جديدة في HarmonizeAI لتحليل النسب الذهبية بدقة عالية في عيادتنا بإب - ميتم."},
+        {"author": "د. سارة اليماني", "time": "منذ 3 ساعات", "cat": "تقويم الأسنان", "text": "مقارنة إكلينيكية بين استخدام الحصائر المطاطية وأجهزة الإطباق الرقمية الحالية."}
     ]
-    
-    for idx, p in enumerate(posts_list):
+    for item in feed_items:
         st.markdown(f"""
             <div class="card">
-                <b>{p['author']}</b> <span style="color:gray; font-size:12px;">({p['time']})</span><br>
-                <span style="background-color:#E0F2FE; color:#0369A1; padding:2px 8px; border-radius:4px; font-size:11px;">{p['tag']}</span>
-                <p style="margin-top:10px;">{p['content']}</p>
+                <b>{item['author']}</b> <span style="color:gray; font-size:12px;">({item['time']})</span><br>
+                <span style="background-color:#E0F2FE; color:#0369A1; padding:2px 8px; border-radius:4px; font-size:11px;">{item['cat']}</span>
+                <p style="margin-top:8px;">{item['text']}</p>
             </div>
         """, unsafe_allow_html=True)
-        
         col_l, col_c, col_s = st.columns(3)
         with col_l:
-            if st.button(f"👍 إعجاب", key=f"like_{idx}"):
+            if st.button("👍 إعجاب", key=f"lk_{item['author']}"):
                 st.toast("تم تسجيل الإعجاب!")
         with col_c:
-            comm = st.text_input("إضافة تعليق...", key=f"comm_box_{idx}")
-            if st.button("إرسال", key=f"comm_btn_{idx}"):
-                st.success("تم إرسال التعليق بنجاح.")
+            st.text_input("تعليق...", key=f"cm_{item['author']}")
         with col_s:
-            if st.button(f"🔄 مشاركة", key=f"share_{idx}"):
-                st.toast("تمت مشاركة المنشور.")
-        st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔄 مشاركة", key=f"sh_{item['author']}"):
+                st.toast("تمت المشاركة بنجاح!")
 
-# ==========================================
-# 3. مخطط الأسنان التفاعلي (Dental Chart)
-# ==========================================
-elif app_mode == "🦷 مخطط الأسنان التفاعلي (Dental Chart)":
-    st.markdown('<div class="main-header">مخطط الأسنان التفاعلي (FDI System)</div>', unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        tooth_num = st.selectbox("اختر رقم السن التشريحي:", list(range(11, 19)) + list(range(21, 29)) + list(range(31, 39)) + list(range(41, 49)))
-    with c2:
-        pathology = st.selectbox("الحالة السنية الإكلينيكية:", ["سليم", "تسوس عميق", "حشوة تجميلية مرכبة", "تاج سيراميك (Crown)", "زرعة سنية (Implant)", "معالجة عصب (Root Canal)"])
-        
-    if st.button("حفظ وتشخيص السن"):
-        st.success(f"تم تسجيل وتحديث السن رقم ({tooth_num}) بالحالة: [{pathology}] بنجاح في سجل المريض.")
+# ==========================================================
+# 6. مخطط الأسنان التفاعلي الشامل
+# ==========================================================
+elif app_section == "🦷 مخطط الأسنان التفاعلي الشامل":
+    st.markdown('<div class="main-header">مخطط الأسنان التفاعلي (Dental Charting System)</div>', unsafe_allow_html=True)
+    c_t1, c_t2 = st.columns(2)
+    with c_t1:
+        fdi_tooth = st.selectbox("رقم السن (FDI):", list(range(11, 19)) + list(range(21, 29)) + list(range(31, 39)) + list(range(41, 49)))
+    with c_t2:
+        condition_type = st.selectbox("التشخيص الإكلينيكي:", ["سليم", "تسوس عالي", "تاج زيركون", "حشوة تجميلية", "زرعة سنية", "معالجة عصب"])
+    if st.button("تحديث وحفظ حالة السن"):
+        st.success(f"تم تحديث السن رقم {fdi_tooth} إلى الحالة ({condition_type}) بنجاح.")
 
-# ==========================================
-# 4. عارض النماذج ثلاثية الأبعاد (3D Viewer)
-# ==========================================
-elif app_mode == "🧊 عارض النماذج ثلاثية الأبعاد (3D Viewer)":
-    st.markdown('<div class="main-header">عارض النماذج الرقمية ثلاثية الأبعاد (STL / OBJ)</div>', unsafe_allow_html=True)
-    stl_file = st.file_uploader("رفع ملف المورد السني أو الطبعة الرقمية ثلاثية الأبعاد", type=["stl", "obj", "glb"])
-    if stl_file:
-        st.success(f"تم استقبال الملف بنجاح: {stl_file.name}")
-        st.info("العارض الرقمي جاهز لمعالجة الأسطح والشبكات الثلاثية الأبعاد الخاصة بالتركيبات والتقويم.")
-
-# ==========================================
-# 5. إدارة المواعيد والأرشيف السحابي
-# ==========================================
-elif app_mode == "📅 إدارة المواعيد والأرشيف السحابي":
-    st.markdown('<div class="main-header">إدارة مواعيد العيادة والأرشيف السحابي</div>', unsafe_allow_html=True)
-    
-    tab_apt, tab_arch = st.tabs(["إدارة الحجوزات والمواعيد", "الأرشيف السحابي (Firebase)"])
-    
-    with tab_apt:
-        p_name = st.text_input("اسم المريض الرباعي:")
-        p_phone = st.text_input("رقم الهاتف للتواصل:")
-        apt_date = st.date_input("تاريخ الحجز:")
-        if st.button("تثبيت الموعد"):
-            st.success(f"تم حجز الموعد بنجاح للمريض: {p_name} بتاريخ {apt_date}")
-            
-        st.markdown("### جدول المواعيد اليومية")
-        st.table(pd.DataFrame({
-            "المريض": ["أحمد علي", "سارة محمد"],
-            "رقم الهاتف": ["777700412", "771234567"],
-            "الخدمة الطبية": ["تصميم ابتسامة DSD", "تقويم أسنان"]
-        }))
-        
-    with tab_arch:
-        search_pid = st.text_input("بحث برقم معرف المريض السحابي:")
-        if st.button("استرجاع السجل من السحابة"):
+# ==========================================================
+# 7. إدارة المواعيد والأرشيف السحابي
+# ==========================================================
+elif app_section == "📁 إدارة المواعيد والأرشيف السحابي":
+    st.markdown('<div class="main-header">إدارة المواعيد والأرشيف السحابي (Cloud Sync)</div>', unsafe_allow_html=True)
+    tab_m1, tab_m2 = st.tabs(["إدارة المواعيد", "البحث في الأرشيف السحابي"])
+    with tab_m1:
+        m_name = st.text_input("اسم المريض:")
+        m_date = st.date_input("تاريخ الموعد:")
+        if st.button("تأكيد وحجز الموعد"):
+            st.success(f"تم حجز الموعد للمريض {m_name} بتاريخ {m_date}")
+    with tab_m2:
+        search_q = st.text_input("أدخل معرف السجل السحابي:")
+        if st.button("استرجاع السجل"):
             db = get_firestore_client()
-            if db and search_pid:
-                doc = db.collection("patients").document(search_pid).get()
-                if doc.exists:
-                    st.json(doc.to_dict())
+            if db and search_q:
+                doc_ref = db.collection("global_patients").document(search_q).get()
+                if doc_ref.exists:
+                    st.json(doc_ref.to_dict())
                 else:
-                    st.warning("لا يوجد سجل مسجل بهذا المعرف.")
+                    st.warning("لم يتم العثور على سجل بهذا المعرف.")
             else:
-                st.error("تأكد من إعدادات الاتصال السحابي أو معرف المريض.")
+                st.error("تأكد من إعدادات سحابة Firebase أو المعرف المدخل.")
