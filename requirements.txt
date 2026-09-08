@@ -1,8 +1,2 @@
-streamlit>=1.32
-pandas
-numpy
-pillow
-requests
-plotly
-opencv-python-headless
-mediapipe
+pip install streamlit pandas numpy pillow opencv-python-headless mediapipe plotly reportlab
+streamlit run app_with_features.py
