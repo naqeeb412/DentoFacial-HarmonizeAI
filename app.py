@@ -1,13 +1,13 @@
 # ============================================================
 #  🦷 DENTAL AI OS — Comprehensive Dental Analysis System
-#  All-in-One File | Fixed Version
-#  Fixes: imports | mediapipe | duplicated code | session state
+#  Version: 2.1 | Streamlit Cloud Compatible
+#  - MediaPipe optional (works with or without it)
+#  - No build errors on Streamlit Cloud
 # ============================================================
 
 import streamlit as st
 import numpy as np
 import cv2
-import mediapipe as mp
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 import io
 import base64
@@ -20,10 +20,6 @@ import hashlib
 import pandas as pd
 from io import BytesIO
 import time
-import os
-import sys
-import platform
-import re
 import json
 
 # ── Page Config ──
@@ -33,6 +29,46 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================================
+#  🧠 MediaPipe (اختياري — آمن لجميع البيئات)
+# ============================================================
+MEDIAPIPE_AVAILABLE = False
+mp_face_mesh = None
+mp_drawing = None
+mp_drawing_styles = None
+
+try:
+    import mediapipe as mp
+    try:
+        from mediapipe.python.solutions import face_mesh as mp_face_mesh
+        from mediapipe.python.solutions import drawing_utils as mp_drawing
+        from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
+        MEDIAPIPE_AVAILABLE = True
+    except ImportError:
+        try:
+            mp_face_mesh = mp.solutions.face_mesh
+            mp_drawing = mp.solutions.drawing_utils
+            mp_drawing_styles = mp.solutions.drawing_styles
+            MEDIAPIPE_AVAILABLE = True
+        except AttributeError:
+            MEDIAPIPE_AVAILABLE = False
+except Exception:
+    MEDIAPIPE_AVAILABLE = False
+
+def get_face_mesh():
+    """Lazy init — يعيد None إذا لم تكن MediaPipe متاحة."""
+    if not MEDIAPIPE_AVAILABLE or mp_face_mesh is None:
+        return None
+    try:
+        return mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5
+        )
+    except Exception:
+        return None
 
 # ── Custom CSS ──
 CUSTOM_CSS = """
@@ -55,7 +91,7 @@ CUSTOM_CSS = """
     .tooth:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); border-color: #00d4ff; }
     .tooth .num { font-size: 9px; opacity: 0.5; margin-top: 2px; }
     .tooth .status-icon { font-size: 14px; line-height: 1; }
-    .tooth.missing { background: #f1f3f5; border-color: #adb5bd; opacity: 0.5; cursor: default; }
+    .tooth.missing { background: #f1f3f5; border-color: #adb5bd; opacity: 0.5; }
     .tooth.carious { background: #fde8e8; border-color: #ef4444; }
     .tooth.treated { background: #d5f5e3; border-color: #10b981; }
     .tooth.crown { background: #fef9e7; border-color: #f59e0b; }
@@ -76,7 +112,7 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 # ── Session State ──
 defaults = {
     "original_img": None, "processed_img": None, "analysis_img": None,
-    "xray_img": None, "face_mesh_results": None, "landmarks_468": None,
+    "xray_img": None, "landmarks_468": None,
     "diagnosis_report": {}, "golden_ratio_data": {},
     "smile_score": 0, "symmetry_score": 0, "golden_score": 0,
     "patients": [], "dentbook_posts": [], "messages": [],
@@ -96,12 +132,7 @@ defaults = {
         5: {"name": "الرندرة الفائقة", "status": "inactive", "progress": 0},
     },
     "natural_teeth_layers": [], "image_layers": [], "current_layer": 0,
-    "cephalometric_data": {
-        "SNA": 82, "SNB": 80, "ANB": 2,
-        "SN-MP": 32, "FMA": 25, "IMPA": 90,
-        "Overjet": 3, "Overbite": 2,
-    },
-    "facial_analysis_results": [], "smile_designs": [],
+    "cephalometric_data": {"SNA": 82, "SNB": 80, "ANB": 2},
     "system_logo": None, "otp_store": {},
     "last_analysis_image": None, "last_analysis_data": None,
     "last_cephalometric_image": None, "last_cephalometric_data": None,
@@ -123,16 +154,12 @@ def hash_pass(password):
 def generate_otp():
     return ''.join(random.choices('0123456789', k=6))
 
-# Initialize users_db if empty
 if not st.session_state.users_db:
     st.session_state.users_db = {
         OWNER_EMAIL: {
-            "name": "علي النقيب",
-            "email": OWNER_EMAIL,
-            "password": OWNER_PASSWORD_HASH,
-            "role": "owner",
-            "specialty": "طب أسنان تجميلي",
-            "country": "اليمن",
+            "name": "علي النقيب", "email": OWNER_EMAIL,
+            "password": OWNER_PASSWORD_HASH, "role": "owner",
+            "specialty": "طب أسنان تجميلي", "country": "اليمن",
             "phone": "+967 77 123 4567",
             "bio": "مؤسس منصة Dentofacial HarmonizeAI™",
             "platforms": ["email"],
@@ -140,7 +167,6 @@ if not st.session_state.users_db:
         }
     }
 
-# Initialize specialists
 if not st.session_state.specialists:
     st.session_state.specialists = [
         {"name": "د. أحمد العمري", "specialty": "تقويم أسنان", "online": True, "phone": "+966 55 123 4567"},
@@ -148,7 +174,6 @@ if not st.session_state.specialists:
         {"name": "د. خالد النقيب", "specialty": "طب الأسنان التجميلي", "online": False, "phone": "+966 55 123 4569"},
     ]
 
-# Initialize analytics data
 if st.session_state.patients_df is None:
     st.session_state.patients_df = pd.DataFrame({
         'اسم_المريض': ['أحمد محمد', 'سارة عبدالله', 'خالد العلي', 'نورة سعد', 'فهد الدوسري'],
@@ -159,11 +184,7 @@ if st.session_state.patients_df is None:
         'التكلفة_ريال': [3500, 12000, 25000, 18000, 8500],
         'المدة_شهر': [1, 2, 6, 18, 1.5],
         'رضا_المريض_%': [95, 88, 92, 85, 96],
-        'مضاعفات': ['لا يوجد', 'حساسية خفيفة', 'تورم مؤقت', 'لا يوجد', 'لا يوجد'],
         'الحالة_النهائية': ['ممتازة', 'جيدة', 'ممتازة', 'جيدة', 'ممتازة'],
-        'تاريخ_الزيارة': pd.to_datetime(['2026-01-15', '2026-02-20', '2026-03-10', '2026-04-05', '2026-05-12']),
-        'قبل_العلاج': ['اصفرار', 'كسر', 'فقدان', 'تزاحم', 'تشقق'],
-        'بعد_العلاج': ['أبيض ناصع', 'تيجان مثالية', 'زرعات ثابتة', 'ابتسامة منتظمة', 'فينيرز ناعمة']
     })
 
 if st.session_state.before_after_data is None:
@@ -174,36 +195,11 @@ if st.session_state.before_after_data is None:
         'التحسن_%': [111, 53, 29, 60, 96]
     })
 
-# ============================================================
-#  🧠 MediaPipe Face Mesh Setup (Safe Import)
-# ============================================================
-try:
-    mp_face_mesh = mp.solutions.face_mesh
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
-except AttributeError:
-    from mediapipe.python.solutions import face_mesh as mp_face_mesh_module
-    from mediapipe.python.solutions import drawing_utils as mp_drawing
-    from mediapipe.python.solutions import drawing_styles as mp_drawing_styles
-    mp_face_mesh = mp_face_mesh_module
-
-def get_face_mesh():
-    """Lazy initialization of FaceMesh to avoid errors."""
-    return mp_face_mesh.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5
-    )
-
 # ── Key Landmark Indices ──
 FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
              397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
              172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109]
-
 LIPS_OUTER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
-LIPS_UPPER = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409]
-LIPS_LOWER = [291, 375, 321, 405, 314, 17, 84, 181, 91, 146]
 LEFT_EYE = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
 RIGHT_EYE = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
 LEFT_EYEBROW = [276, 283, 282, 295, 285, 300, 293, 334, 296, 336]
@@ -218,15 +214,13 @@ PHI = 1.618033988749895
 # ============================================================
 
 def get_system_logo():
-    if "system_logo" in st.session_state and st.session_state.system_logo:
-        return st.session_state.system_logo
-    return None
+    return st.session_state.get("system_logo", None)
 
 def display_system_logo(width=50):
     logo = get_system_logo()
     if logo:
         return f'<img src="data:image/png;base64,{logo}" style="width:{width}px; height:{width}px; border-radius:50%; object-fit:cover;" />'
-    return '<div style="background:#00d4ff; width:'+str(width)+'px; height:'+str(width)+'px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; color:#0a0a0a;">🦷</div>'
+    return f'<div style="background:#00d4ff; width:{width}px; height:{width}px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; color:#0a0a0a;">🦷</div>'
 
 def get_landmark_xy(landmarks, idx, w, h):
     lm = landmarks.landmark[idx]
@@ -242,10 +236,22 @@ def calculate_golden_ratio(a, b):
     return max(0, min(100, (1 - deviation) * 100))
 
 def analyze_face_mesh(image):
+    """تحليل الوجه باستخدام MediaPipe (إن كانت متاحة)."""
+    if not MEDIAPIPE_AVAILABLE:
+        return None, None, None
+    
     img_rgb = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     h, w = img_rgb.shape[:2]
-    with get_face_mesh() as face_mesh:
-        results = face_mesh.process(cv2.cvtColor(img_rgb, cv2.COLOR_BGR2RGB))
+    
+    fm = get_face_mesh()
+    if fm is None:
+        return None, None, None
+    
+    try:
+        with fm as face_mesh:
+            results = face_mesh.process(cv2.cvtColor(img_rgb, cv2.COLOR_BGR2RGB))
+    except Exception:
+        return None, None, None
     
     if not results.multi_face_landmarks:
         return None, None, None
@@ -390,21 +396,6 @@ def generate_natural_teeth(count=10):
     draw.rectangle([0, 170, 600, 190], fill='#e8b4b8')
     return img
 
-def draw_landmarks_on_image(image, landmarks_count=478):
-    if isinstance(image, Image.Image):
-        img = image.copy()
-    else:
-        img = Image.open(image) if isinstance(image, str) else image
-    draw = ImageDraw.Draw(img)
-    w, h = img.size
-    colors = ['#00d4ff', '#64ffda', '#ffd700', '#ff6b6b', '#ff9ff3']
-    for i in range(min(landmarks_count, 100)):
-        x = random.randint(10, w-10)
-        y = random.randint(10, h-10)
-        color = random.choice(colors)
-        draw.ellipse([x-3, y-3, x+3, y+3], fill=color)
-    return img
-
 def apply_ai_effects(img, smile, white, skin, zir, brow):
     if img is None: return None
     img = img.convert("RGB")
@@ -508,12 +499,10 @@ def real_cephalometric_analysis(image):
     analysis = {
         "SNA": 82.5, "SNB": 80.0, "ANB": 2.5,
         "SN-MP": 32.0, "FMA": 25.0, "IMPA": 90.0,
-        "Overjet": 3.0, "Overbite": 2.0,
         "analysis_image": None
     }
     result = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
     cv2.line(result, (int(w*0.3), int(h*0.3)), (int(w*0.5), int(h*0.2)), (0, 255, 0), 2)
-    cv2.putText(result, "S-N", (int(w*0.3), int(h*0.25)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
     y_offset = 30
     for key, value in analysis.items():
         if key != "analysis_image":
@@ -534,7 +523,7 @@ def get_tooth_status(index):
 
 def render_dental_chart():
     html = '<div style="overflow-x:auto;padding:10px 0;"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:700px;">'
-    html += '<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap;"><div style="width:100%;text-align:center;font-weight:700;font-size:14px;color:#94a3b8;margin:4px 0 8px;letter-spacing:2px;">⬆ الفك العلوي</div>'
+    html += '<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap;"><div style="width:100%;text-align:center;font-weight:700;font-size:14px;color:#94a3b8;margin:4px 0 8px;">⬆ الفك العلوي</div>'
     status_map = {'normal': {'icon': '🟢', 'cls': ''}, 'missing': {'icon': '', 'cls': 'missing'},
                   'carious': {'icon': '🦷', 'cls': 'carious'}, 'treated': {'icon': '✔️', 'cls': 'treated'},
                   'crown': {'icon': '👑', 'cls': 'crown'}, 'root-canal': {'icon': '🧬', 'cls': 'root-canal'}}
@@ -542,14 +531,14 @@ def render_dental_chart():
         status = get_tooth_status(i)
         s = status_map.get(status, status_map['normal'])
         icon_html = '' if status == 'missing' else f'<span class="status-icon">{s["icon"]}</span>'
-        html += f'<div class="tooth {s["cls"]}" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
+        html += f'<div class="tooth {s["cls"]}">{icon_html}<span class="num">{i+1}</span></div>'
     html += '</div>'
-    html += '<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap;"><div style="width:100%;text-align:center;font-weight:700;font-size:14px;color:#94a3b8;margin:4px 0 8px;letter-spacing:2px;">⬇ الفك السفلي</div>'
+    html += '<div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap;"><div style="width:100%;text-align:center;font-weight:700;font-size:14px;color:#94a3b8;margin:4px 0 8px;">⬇ الفك السفلي</div>'
     for i in range(16, 32):
         status = get_tooth_status(i)
         s = status_map.get(status, status_map['normal'])
         icon_html = '' if status == 'missing' else f'<span class="status-icon">{s["icon"]}</span>'
-        html += f'<div class="tooth {s["cls"]}" data-index="{i}" data-status="{status}">{icon_html}<span class="num">{i+1}</span></div>'
+        html += f'<div class="tooth {s["cls"]}">{icon_html}<span class="num">{i+1}</span></div>'
     html += '</div>'
     html += '''<div class="tooth-legend">
         <div class="legend-item"><span class="swatch normal"></span> سليم</div>
@@ -575,14 +564,9 @@ def get_3d_viewer_html():
     </head>
     <body>
         <div id="container"></div>
-        <div class="info">🦷 3D Viewer - اسحب للتدوير | تمرير للتكبير</div>
+        <div class="info">🦷 3D Viewer - اسحب للتدوير</div>
         <script type="importmap">
-        {
-            "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-            }
-        }
+        {"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
         </script>
         <script type="module">
             import * as THREE from 'three';
@@ -598,7 +582,6 @@ def get_3d_viewer_html():
             const controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.autoRotate = true;
-            controls.autoRotateSpeed = 2.0;
             scene.add(new THREE.AmbientLight(0x404060));
             const mainLight = new THREE.DirectionalLight(0xffffff, 1);
             mainLight.position.set(5, 10, 7);
@@ -624,7 +607,7 @@ def get_3d_viewer_html():
     </html>
     '''
 
-def generate_html_report(patient_name, analysis_results, images):
+def generate_html_report(patient_name, images):
     html = f"""
     <!DOCTYPE html>
     <html dir="rtl">
@@ -657,11 +640,10 @@ def generate_html_report(patient_name, analysis_results, images):
 # ============================================================
 def login_user(email, password):
     db = st.session_state.users_db
-    if email in db:
-        if db[email]["password"] == hash_pass(password):
-            st.session_state.authenticated = True
-            st.session_state.current_user = db[email]
-            return True
+    if email in db and db[email]["password"] == hash_pass(password):
+        st.session_state.authenticated = True
+        st.session_state.current_user = db[email]
+        return True
     return False
 
 def login_with_platform(email, platform, user_data=None):
@@ -675,10 +657,10 @@ def login_with_platform(email, platform, user_data=None):
         st.session_state.current_user = db[email]
         return True, "تم تسجيل الدخول بنجاح"
     if user_data:
-        name = user_data.get("name", f"مستخدم {platform}")
         db[email] = {
-            "name": name, "email": email, "password": "",
-            "role": "doctor", "specialty": user_data.get("specialty", ""),
+            "name": user_data.get("name", f"مستخدم {platform}"),
+            "email": email, "password": "", "role": "doctor",
+            "specialty": user_data.get("specialty", ""),
             "phone": user_data.get("phone", ""), "country": user_data.get("country", ""),
             "bio": "", "platforms": [platform],
             "created_at": datetime.now().isoformat()
@@ -736,12 +718,15 @@ def auth_page():
         </div>
         """, unsafe_allow_html=True)
 
+        if MEDIAPIPE_AVAILABLE:
+            st.success("✅ MediaPipe متاح — جميع الميزات مفعّلة")
+        else:
+            st.warning("⚠️ MediaPipe غير متاح — بعض ميزات تحليل الوجه معطّلة")
+
         st.markdown("### 🔐 طرق تسجيل الدخول")
         
-        social_platforms = [
-            ("Google", "🔵", "google"), ("Facebook", "🔷", "facebook"),
-            ("Instagram", "🟣", "instagram"), ("WhatsApp", "🟢", "whatsapp")
-        ]
+        social_platforms = [("Google", "🔵", "google"), ("Facebook", "🔷", "facebook"),
+                           ("Instagram", "🟣", "instagram"), ("WhatsApp", "🟢", "whatsapp")]
         cols1 = st.columns(4)
         for i, (name, icon, key) in enumerate(social_platforms):
             with cols1[i]:
@@ -792,7 +777,7 @@ def sidebar_nav():
         <div style="text-align:center; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:10px;">
             {display_system_logo(50)}
             <div style="font-weight:700; font-size:1.1rem; margin-top:6px;">🦷 DENTAL AI OS</div>
-            <div style="font-size:0.7rem; color:#aac4d6;">v2.0 · AI-Powered</div>
+            <div style="font-size:0.7rem; color:#aac4d6;">v2.1 · Cloud-Ready</div>
         </div>
         <div style="text-align:center; margin-bottom:16px;">
             <div style="font-size:0.85rem; font-weight:600;">{user['name']}</div>
@@ -863,6 +848,9 @@ def page_home():
     st.markdown('<div class="main-header">🦷 DENTAL AI OS</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">منصة متكاملة لتحليل الأسنان والوجه بالذكاء الاصطناعي</div>', unsafe_allow_html=True)
     
+    if not MEDIAPIPE_AVAILABLE:
+        st.info("ℹ️ ملاحظة: ميزة تحليل الوجه 468 نقطة معطّلة بسبب عدم توفر MediaPipe في هذه البيئة. باقي الميزات تعمل بشكل طبيعي.")
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown('<div class="metric-card"><div class="metric-value">468</div><div class="metric-label">نقطة وجهية</div></div>', unsafe_allow_html=True)
@@ -881,6 +869,7 @@ def page_home():
             <li><strong style="color:#ffd700;">✨ النسبة الذهبية</strong> — تحليل التناسق الجمالي</li>
             <li><strong style="color:#ff9ff3;">😊 تحليل الابتسامة</strong> — تقييم جمال الابتسامة</li>
             <li><strong style="color:#2ecc71;">🎨 محاكاة AI</strong> — محاكاة النتائج التجميلية</li>
+            <li><strong style="color:#f39c12;">🩻 تحليل الأشعة AI</strong> — تحليل سيفالومتري</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -915,6 +904,12 @@ def page_upload_logo():
 
 def page_face_analysis():
     st.markdown('<div class="section-title">🧠 تحليل الوجه 468 نقطة</div>', unsafe_allow_html=True)
+    
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("❌ MediaPipe غير متاح في هذه البيئة.")
+        st.info("💡 يمكنك الاستفادة من باقي الميزات: محاكاة AI، تحليل الأشعة، الجداول، والعارض 3D")
+        return
+    
     uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg", "png", "jpeg"])
     if uploaded:
         img = Image.open(uploaded)
@@ -935,6 +930,11 @@ def page_face_analysis():
 
 def page_golden_ratio():
     st.markdown('<div class="section-title">✨ النسبة الذهبية (Φ = 1.618)</div>', unsafe_allow_html=True)
+    
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("❌ MediaPipe غير متاح — الميزة معطّلة.")
+        return
+    
     uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg", "png", "jpeg"], key="golden_upload")
     if uploaded:
         img = Image.open(uploaded)
@@ -956,6 +956,11 @@ def page_golden_ratio():
 
 def page_smile_analysis():
     st.markdown('<div class="section-title">😊 تحليل الابتسامة</div>', unsafe_allow_html=True)
+    
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("❌ MediaPipe غير متاح — الميزة معطّلة.")
+        return
+    
     uploaded = st.file_uploader("📸 حمّل صورة الوجه", type=["jpg", "png", "jpeg"], key="smile_upload")
     if uploaded:
         img = Image.open(uploaded)
@@ -1008,6 +1013,10 @@ def page_ai_simulator():
                 st.session_state.original_img, smile, white, skin, zir, brow
             )
             st.success("✅ تم التطبيق!")
+        
+        if st.button("🔄 إعادة تعيين", use_container_width=True):
+            st.session_state.processed_img = st.session_state.original_img.copy()
+            st.rerun()
     
     with col2:
         st.markdown("### 🎨 النتيجة")
@@ -1136,7 +1145,6 @@ def page_dentbook():
                     "author": st.session_state.current_user["name"],
                     "content": content,
                     "time": datetime.now().strftime("%H:%M"),
-                    "likes": 0
                 })
                 st.success("✅ تم النشر!")
                 st.rerun()
@@ -1403,9 +1411,7 @@ def page_appointments():
     patient = st.text_input("المريض")
     date = st.date_input("التاريخ", datetime.now())
     if st.button("📅 إضافة موعد", type="primary"):
-        st.session_state.appointments.append({
-            "patient": patient, "date": date.strftime("%Y-%m-%d")
-        })
+        st.session_state.appointments.append({"patient": patient, "date": date.strftime("%Y-%m-%d")})
         st.success("✅ تم!")
         st.rerun()
     for app in st.session_state.appointments:
@@ -1483,11 +1489,11 @@ def page_reports():
     
     if st.button("📄 توليد تقرير", type="primary", use_container_width=True):
         if images:
-            html_content = generate_html_report(patient_name, {}, images)
+            html_content = generate_html_report(patient_name, images)
             st.download_button(
                 label="⬇️ تحميل التقرير",
                 data=html_content.encode('utf-8'),
-                file_name=f"report_{patient_name}_{datetime.now().strftime('%Y%m%d')}.html",
+                file_name=f"report_{datetime.now().strftime('%Y%m%d')}.html",
                 mime="text/html"
             )
             st.success("✅ تم التوليد!")
@@ -1501,7 +1507,7 @@ def page_privacy():
     <div class="card">
         <p style="color:#8892b0; line-height:1.8;">
         <strong>سياسة الخصوصية:</strong> نحن نلتزم بحماية بياناتك الشخصية.<br>
-        <strong>🔐 الأمان:</strong> جميع البيانات مشفرة ومحمية.<br>
+        <strong>🔐 الأمان:</strong> جميع البيانات مشفرة ومحمية.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -1512,7 +1518,7 @@ def page_ip():
     st.markdown("""
     <div class="card">
         <p style="color:#8892b0; line-height:1.8;">
-        <strong>حقوق الملكية الفكرية:</strong> جميع المحتويات محمية بموجب حقوق النشر.<br>
+        <strong>حقوق الملكية الفكرية:</strong> جميع المحتويات محمية بموجب حقوق النشر.
         </p>
     </div>
     """, unsafe_allow_html=True)
