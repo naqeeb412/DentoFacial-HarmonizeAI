@@ -15,7 +15,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from io import BytesIO
-🦷 DENTAL AI OS v7.0 — النسخة النهائية الكاملة
 
 جميع الأقسام تعمل + AI في كل مكان + تصميم يدوي + تلقائي
 
