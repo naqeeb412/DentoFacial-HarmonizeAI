@@ -215,7 +215,6 @@ def get_landmark_xy(landmarks, idx, w, h):
 def calc_dist(p1, p2):
     return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
 
-def analyze_face_468(image):
 def page_face_analysis():
     st.markdown('<div class="section-title">🧠 تحليل الوجه 468 نقطة</div>', unsafe_allow_html=True)
     st.caption("رسم كامل لـ 468 نقطة تشريحية + قياسات + تحليل AI")
