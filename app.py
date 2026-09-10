@@ -982,5 +982,475 @@ def page_cephalometric():
         with c3:
             st.metric("FMA", f"{a.get('FMA', 0):.1f}°")
             st.metric("IMPA", f"{a.get('IMPA', 0):.1f}°")
+       
+def page_before_after_simulation():
+    st.markdown('<div class="section-title">🎬 محاكاة قبل / بعد العلاج</div>', unsafe_allow_html=True)
+    img = image_upload_section("ba", "📸 ارفع صورة المريض")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    st.image(img, use_container_width=True)
+    tab1, tab2 = st.tabs(["🤖 تلقائي AI", "✏️ يدوي"])
+    with tab1:
+        c1, c2 = st.columns(2)
+        with c1:
+            treatment = st.selectbox("نوع العلاج", ["تبييض", "زركونيا", "فينير", "تجميلي شامل"], key="ba_treat")
+        with c2:
+            style = st.selectbox("النمط", ["طبيعي", "هوليوود", "زركونيا لامع"], key="ba_style")
+        if st.button("🤖 إنتاج محاكاة AI", type="primary", use_container_width=True, key="btn_ba_ai"):
+            with st.spinner("🤖..."):
+                if style == "هوليوود":
+                    after = apply_photorealism(img, 60, 95, 30, 60, 20, 10, 10, 30)
+                elif style == "زركونيا لامع":
+                    after = apply_photorealism(img, 40, 90, 10, 95, 10, 5, 0, 20)
+                else:
+                    after = apply_photorealism(img, 30, 75, 20, 40, 15, 5, 5, 15)
+                st.session_state.last_before_after = (img, after)
+                st.rerun()
+    with tab2:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            white_m = st.slider("✨ تبييض", 0, 100, 0, key="m_white")
+            smile_m = st.slider("😊 ابتسامة", 0, 100, 0, key="m_smile")
+        with c2:
+            zir_m = st.slider("🔷 زركونيا", 0, 100, 0, key="m_zir")
+            skin_m = st.slider("💉 بشرة", 0, 100, 0, key="m_skin")
+        with c3:
+            brow_m = st.slider("👁️ حواجب", 0, 100, 0, key="m_brow")
+            glow_m = st.slider("✨ توهج", 0, 100, 0, key="m_glow")
+        if st.button("✏️ تطبيق يدوي", type="primary", use_container_width=True, key="btn_ba_manual"):
+            with st.spinner("🎨..."):
+                after = apply_photorealism(img, smile_m, white_m, skin_m, zir_m, brow_m, 0, 0, glow_m)
+                st.session_state.last_before_after = (img, after)
+                st.rerun()
+    if st.session_state.get("last_before_after"):
+        before, after = st.session_state.last_before_after
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("#### 📷 قبل")
+            st.image(before, use_container_width=True)
+        with c2:
+            st.markdown("#### ✨ بعد")
+            st.image(after, use_container_width=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button("⬇️ قبل", img_to_bytes(before), "before.png", "image/png", use_container_width=True, key="dl_ba_before")
+        with c2:
+            st.download_button("⬇️ بعد", img_to_bytes(after), "after.png", "image/png", use_container_width=True, key="dl_ba_after")
+
+
+def page_ai_simulator():
+    st.markdown('<div class="section-title">🎨 محاكاة الذكاء الاصطناعي</div>', unsafe_allow_html=True)
+    img = image_upload_section("sim", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    tab1, tab2 = st.tabs(["🤖 AI Auto", "✏️ Manual"])
+    with tab1:
+        treatment = st.selectbox("العلاج", ["تجميلي شامل", "تبييض", "زركونيا", "فينير", "بوتوكس"], key="sim_treat")
+        if st.button("🚀 تطبيق AI", type="primary", use_container_width=True, key="btn_sim_ai"):
+            with st.spinner("🤖..."):
+                if treatment == "تجميلي شامل":
+                    result = apply_photorealism(img, 50, 85, 30, 60, 20, 5, 5, 15)
+                elif treatment == "تبييض":
+                    result = apply_photorealism(img, 0, 80, 0, 0, 0, 0, 0, 0)
+                elif treatment == "زركونيا":
+                    result = apply_photorealism(img, 40, 85, 10, 90, 10, 5, 0, 10)
+                elif treatment == "فينير":
+                    result = apply_photorealism(img, 40, 75, 20, 40, 15, 5, 5, 15)
+                else:
+                    result = apply_photorealism(img, 20, 30, 70, 0, 70, 0, 0, 0)
+                st.session_state.processed_img = result
+                st.rerun()
+    with tab2:
+        c1, c2 = st.columns(2)
+        with c1:
+            smile = st.slider("😊 ابتسامة", 0, 100, 0, key="sm_s")
+            white = st.slider("✨ تبييض", 0, 100, 0, key="sm_w")
+            skin = st.slider("💉 بشرة", 0, 100, 0, key="sm_sk")
+        with c2:
+            zir = st.slider("🔷 زركونيا", 0, 100, 0, key="sm_z")
+            brow = st.slider("👁️ حواجب", 0, 100, 0, key="sm_b")
+            glow = st.slider("✨ توهج", 0, 100, 0, key="sm_g")
+        if st.button("🚀 تطبيق يدوي", type="primary", use_container_width=True, key="btn_sim_manual"):
+            with st.spinner("🎨..."):
+                result = apply_photorealism(img, smile, white, skin, zir, brow, 0, 0, glow)
+                st.session_state.processed_img = result
+                st.rerun()
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**📷 قبل**")
+        st.image(img, use_container_width=True)
+    with c2:
+        st.markdown("**✨ بعد**")
+        if st.session_state.get("processed_img"):
+            st.image(st.session_state.processed_img, use_container_width=True)
+            st.download_button("⬇️ تحميل", img_to_bytes(st.session_state.processed_img),
+                             "sim.png", "image/png", use_container_width=True, key="dl_sim")
+        else:
+            st.info("اضغط تطبيق")
+
+
+def page_photorealism():
+    st.markdown('<div class="section-title">💎 Photorealism Studio</div>', unsafe_allow_html=True)
+    img = image_upload_section("phr", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        brightness = st.slider("☀️ السطوع", -50, 50, 0, key="phr_b")
+        contrast = st.slider("🎚️ التباين", -50, 50, 0, key="phr_c")
+        saturation = st.slider("🎨 التشبع", -50, 50, 0, key="phr_s")
+        sharpness = st.slider("🔪 الحدة", 0, 100, 0, key="phr_sh")
+        warmth = st.slider("🔥 الدفء", -50, 50, 0, key="phr_w")
+        if st.button("🎨 تطبيق", type="primary", use_container_width=True, key="btn_phr"):
+            with st.spinner("🎨..."):
+                result = img.copy()
+                if brightness != 0:
+                    result = ImageEnhance.Brightness(result).enhance(1 + brightness/100)
+                if contrast != 0:
+                    result = ImageEnhance.Contrast(result).enhance(1 + contrast/100)
+                if saturation != 0:
+                    result = ImageEnhance.Color(result).enhance(1 + saturation/100)
+                if sharpness > 0:
+                    result = ImageEnhance.Sharpness(result).enhance(1 + sharpness/100)
+                if warmth != 0:
+                    arr = np.array(result).astype(np.float32)
+                    arr[:, :, 0] = np.clip(arr[:, :, 0] + warmth, 0, 255)
+                    arr[:, :, 2] = np.clip(arr[:, :, 2] - warmth, 0, 255)
+                    result = Image.fromarray(arr.astype(np.uint8))
+                st.session_state.last_photorealism_image = result
+                st.rerun()
+    with c2:
+        if st.session_state.get("last_photorealism_image"):
+            st.image(st.session_state.last_photorealism_image, use_container_width=True)
+            st.download_button("⬇️ تحميل", img_to_bytes(st.session_state.last_photorealism_image),
+                             "ph.png", "image/png", use_container_width=True, key="dl_phr")
+        else:
+            st.image(img, use_container_width=True)
+
+
+def page_dsd_studio():
+    st.markdown('<div class="section-title">🧬 استوديو DSD</div>', unsafe_allow_html=True)
+    img = image_upload_section("dsd2", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    tab1, tab2 = st.tabs(["🤖 AI Auto", "✏️ Manual"])
+    with tab1:
+        tooth_color = st.selectbox("🎨 لون الأسنان", ["A1", "A2", "A3", "B1", "Hollywood"], key="dsd_ai_c")
+        if st.button("🧬 تصميم AI", type="primary", use_container_width=True, key="btn_dsd_ai"):
+            with st.spinner("🧬..."):
+                arr = np.array(img).astype(np.float32)
+                h, w = arr.shape[:2]
+                mouth = arr[int(h*0.55):int(h*0.8), int(w*0.25):int(w*0.75)]
+                colors = {"A1": [240, 235, 220], "A2": [235, 225, 205], "A3": [225, 210, 185],
+                         "B1": [230, 225, 210], "Hollywood": [255, 255, 250]}
+                target = np.array(colors.get(tooth_color, [235, 230, 215]))
+                if mouth.size > 0:
+                    hsv_m = cv2.cvtColor(mouth.astype(np.uint8), cv2.COLOR_RGB2HSV)
+                    mask = (hsv_m[:, :, 2] > 130) & (hsv_m[:, :, 1] < 60)
+                    for i in range(3):
+                        mouth[:, :, i] = np.where(mask, mouth[:, :, i] * 0.3 + target[i] * 0.7, mouth[:, :, i])
+                    arr[int(h*0.55):int(h*0.8), int(w*0.25):int(w*0.75)] = mouth
+                st.session_state.last_dsd_image = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+                st.rerun()
+    with tab2:
+        white = st.slider("✨ التبييض", 0, 100, 0, key="dsd_m_w")
+        if st.button("✏️ تطبيق يدوي", type="primary", use_container_width=True, key="btn_dsd_manual"):
+            with st.spinner("🎨..."):
+                result = apply_photorealism(img, 0, white, 0, 0, 0, 0, 0, 0)
+                st.session_state.last_dsd_image = result
+                st.rerun()
+    if st.session_state.get("last_dsd_image"):
+        st.image(st.session_state.last_dsd_image, use_container_width=True)
+        st.download_button("⬇️ تحميل", img_to_bytes(st.session_state.last_dsd_image),
+                         "dsd.png", "image/png", use_container_width=True, key="dl_dsd")
+
+
+def page_manual_design():
+    st.markdown('<div class="section-title">✏️ التصميم اليدوي</div>', unsafe_allow_html=True)
+    img = image_upload_section("manual", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    tab1, tab2, tab3 = st.tabs(["🎨 الفلاتر", "✏️ الرسم", "📝 النص"])
+    with tab1:
+        c1, c2 = st.columns(2)
+        with c1:
+            b = st.slider("سطوع", -50, 50, 0, key="md_b")
+            c = st.slider("تباين", -50, 50, 0, key="md_c")
+        with c2:
+            s = st.slider("تشبع", -50, 50, 0, key="md_s")
+            sh = st.slider("حدة", 0, 100, 0, key="md_sh")
+        if st.button("🎨 تطبيق", type="primary", use_container_width=True, key="btn_md_filters"):
+            with st.spinner("🎨..."):
+                result = img.copy()
+                if b != 0:
+                    result = ImageEnhance.Brightness(result).enhance(1 + b/100)
+                if c != 0:
+                    result = ImageEnhance.Contrast(result).enhance(1 + c/100)
+                if s != 0:
+                    result = ImageEnhance.Color(result).enhance(1 + s/100)
+                if sh > 0:
+                    result = ImageEnhance.Sharpness(result).enhance(1 + sh/100)
+                st.session_state.processed_img = result
+                st.rerun()
+    with tab2:
+        draw_type = st.selectbox("نوع الرسم", ["دائرة", "مستطيل", "خط"], key="md_draw_type")
+        color = st.color_picker("اللون", "#00d4ff", key="md_color")
+        width = st.slider("السماكة", 1, 10, 3, key="md_width")
+        if st.button("✏️ إضافة الرسم", use_container_width=True, key="btn_md_draw"):
+            with st.spinner("✏️..."):
+                result = img.copy()
+                draw = ImageDraw.Draw(result)
+                w, h = result.size
+                rgb = tuple(int(color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                if draw_type == "دائرة":
+                    draw.ellipse([w//4, h//4, 3*w//4, 3*h//4], outline=rgb, width=width)
+                elif draw_type == "مستطيل":
+                    draw.rectangle([w//4, h//4, 3*w//4, 3*h//4], outline=rgb, width=width)
+                else:
+                    draw.line([(0, h//2), (w, h//2)], fill=rgb, width=width)
+                st.session_state.processed_img = result
+                st.rerun()
+    with tab3:
+        text = st.text_input("النص", "DENTAL AI OS", key="md_text")
+        text_color = st.color_picker("اللون", "#ffffff", key="md_text_color")
+        text_size = st.slider("الحجم", 20, 100, 40, key="md_text_size")
+        if st.button("📝 إضافة النص", use_container_width=True, key="btn_md_text"):
+            with st.spinner("📝..."):
+                result = img.copy()
+                draw = ImageDraw.Draw(result)
+                try:
+                    font = ImageFont.truetype("arial.ttf", text_size)
+                except:
+                    font = ImageFont.load_default()
+                rgb = tuple(int(text_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+                w, h = result.size
+                draw.text((w//4, h//2), text, fill=rgb, font=font)
+                st.session_state.processed_img = result
+                st.rerun()
+    if st.session_state.get("processed_img"):
+        st.image(st.session_state.processed_img, use_container_width=True)
+        st.download_button("⬇️ تحميل", img_to_bytes(st.session_state.processed_img),
+                         "design.png", "image/png", use_container_width=True, key="dl_md")
+    else:
+        st.image(img, use_container_width=True)
+
+
+def page_cad_cam():
+    st.markdown('<div class="section-title">🎨 CAD/CAM & 3D Studio</div>', unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["🎨 توليد AI", "📦 رفع STL", "⚙️ الأنظمة"])
+    with tab1:
+        prompt = st.text_area("📝 وصف النموذج 3D")
+        if st.button("🎨 توليد AI", type="primary", use_container_width=True, key="btn_3d_ai"):
+            with st.spinner("🎨..."):
+                if GEMINI_API_KEY:
+                    ans = ask_gemini("اقترح مواصفات 3D لنموذج: " + prompt + ". قدم: الأبعاد، المادة، خطوات التصميم")
+                    st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+                else:
+                    st.info("💡 استخدم Meshy AI: https://www.meshy.ai")
+    with tab2:
+        model = st.file_uploader("STL/OBJ/PLY/GLB", type=["stl", "obj", "ply", "glb"])
+        if model:
+            st.success(f"✅ {model.name}")
+            st.session_state.cad_models.append({"name": model.name, "size": model.size})
+        if st.session_state.cad_models:
+            st.dataframe(pd.DataFrame(st.session_state.cad_models), use_container_width=True)
+    with tab3:
+        systems = [("Meshy AI", "https://www.meshy.ai"), ("Blender", "https://www.blender.org"), ("Exocad", "https://exocad.com")]
+        for name, url in systems:
+            st.markdown(f'<div class="card"><strong style="color:#00d4ff;">{name}</strong> <a href="{url}" target="_blank">🔗</a></div>', unsafe_allow_html=True)
+
+
+def page_patient_data():
+    st.markdown('<div class="section-title">📁 بيانات المريض</div>', unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["👤 معلومات", "📸 صور", "🩻 أشعة"])
+    with tab1:
+        with st.form("patient_info"):
+            c1, c2 = st.columns(2)
+            with c1:
+                name = st.text_input("الاسم")
+                age = st.number_input("العمر", 1, 120, 25)
+                gender = st.selectbox("الجنس", ["ذكر", "أنثى"])
+            with c2:
+                treatment = st.selectbox("العلاج", ["تبييض", "زركونيا", "زراعة", "تقويم", "إيماكس"])
+                cost = st.number_input("التكلفة", 0, value=5000)
+                phone = st.text_input("الهاتف")
+            if st.form_submit_button("💾 حفظ", use_container_width=True):
+                st.session_state.patient_files.append({
+                    "name": name, "age": age, "gender": gender,
+                    "phone": phone, "treatment": treatment, "cost": cost,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
+                st.rerun()
+        if st.session_state.patient_files:
+            st.dataframe(pd.DataFrame(st.session_state.patient_files), use_container_width=True)
+    with tab2:
+        imgs = st.file_uploader("📤 صور متعددة", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="pat_imgs")
+        if imgs:
+            cols = st.columns(3)
+            for i, img in enumerate(imgs):
+                with cols[i % 3]:
+                    st.image(img, caption=img.name, use_container_width=True)
+    with tab3:
+        xtype = st.selectbox("النوع", ["سيفالومترية", "بانورامية", "CBCT", "Periapical", "Occlusal", "Bitewing"])
+        xray = st.file_uploader("📤 أشعة", type=["jpg", "png", "jpeg"], key="pat_xray")
+        if xray:
+            st.image(xray, caption=xtype, use_container_width=True)
+            st.session_state.patient_xrays.append({"type": xtype, "name": xray.name})
+
+
+def page_patients_list():
+    st.markdown('<div class="section-title">👥 قائمة المرضى</div>', unsafe_allow_html=True)
+    if st.session_state.patient_files:
+        st.dataframe(pd.DataFrame(st.session_state.patient_files), use_container_width=True)
+    else:
+        st.info("لا يوجد مرضى — اذهب إلى قسم بيانات المريض")
+
+
+def page_photography():
+    st.markdown('<div class="section-title">📸 التصوير الطبي</div>', unsafe_allow_html=True)
+    types_list = ["أمامية", "جانبية", "ابتسامة", "فك علوي", "فك سفلي"]
+    for t in types_list:
+        up = st.file_uploader(t, type=["jpg", "png", "jpeg"], key=f"photo_{t}")
+        if up:
+            st.image(up, use_container_width=True)
+
+
+def page_xray_types():
+    st.markdown('<div class="section-title">🩻 الأشعة (6 أنواع)</div>', unsafe_allow_html=True)
+    types = {
+        "سيفالومترية": "لتحليل علاقة الفكين",
+        "بانورامية": "لرؤية كل الأسنان",
+        "CBCT": "تصوير 3D",
+        "Periapical": "تفاصيل السن",
+        "Occlusal": "سقف وأرضية الفم",
+        "Bitewing": "التسوس بين الأسنان"
+    }
+    sel = st.selectbox("النوع", list(types.keys()))
+    st.info(f"💡 {types[sel]}")
+    up = st.file_uploader("📤 ارفع", type=["jpg", "png", "jpeg"], key="xr_up")
+    if up:
+        st.image(up, use_container_width=True)
+
+
+def page_appointments():
+    st.markdown('<div class="section-title">📅 المواعيد</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        p = st.text_input("المريض", key="app_p")
+        d = st.date_input("التاريخ", datetime.now(), key="app_d")
+    with c2:
+        t = st.time_input("الوقت", datetime.now(), key="app_t")
+        note = st.text_input("ملاحظة", key="app_n")
+    if st.button("📅 إضافة موعد", type="primary", key="btn_app"):
+        st.session_state.appointments.append({"patient": p, "date": str(d), "time": str(t), "note": note})
+        st.rerun()
+    for a in st.session_state.appointments:
+        st.markdown(f'<div class="card">📅 {a["patient"]} — {a["date"]} {a.get("time", "")}</div>', unsafe_allow_html=True)
+
+
+def page_accounting():
+    st.markdown('<div class="section-title">💰 الحساب المالي</div>', unsafe_allow_html=True)
+    t = st.number_input("الكلي", value=1000, key="acc_t")
+    p = st.number_input("المدفوع", value=0, key="acc_p")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("الكلي", t)
+    with c2:
+        st.metric("المدفوع", p)
+    with c3:
+        st.metric("المتبقي", t - p)
+
+
+def page_materials_guide():
+    st.markdown('<div class="section-title">🧪 المواد العلاجية</div>', unsafe_allow_html=True)
+    for mat in st.session_state.treatment_materials:
+        with st.expander(f"💊 {mat['name']}", expanded=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"**📖 الاستخدام:** {mat['usage']}")
+                st.markdown(f"**🔄 البديل:** {mat['alternative']}")
+            with c2:
+                st.markdown(f"**⭐ الميزة:** {mat['advantage']}")
+                st.markdown(f"**💰 التكلفة:** {mat['cost']}")
+    if GEMINI_API_KEY:
+        mat_sel = st.selectbox("اختر مادة", [m['name'] for m in st.session_state.treatment_materials], key="mat_sel")
+        if st.button("🤖 اسأل AI عن المادة", use_container_width=True, key="btn_ask_mat"):
+            with st.spinner("🤖..."):
+                ans = ask_gemini("اشرح مادة " + mat_sel + ": استخدام، ميزات، بدائل، نصائح")
+            st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+
+
+def page_treatment_plan():
+    st.markdown('<div class="section-title">📋 خطة العلاج</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        main = st.text_area("الخطة الرئيسية")
+    with c2:
+        alt = st.text_area("العلاج البديل")
+    materials_used = st.multiselect("المواد المستخدمة", [m['name'] for m in st.session_state.treatment_materials])
+    if st.button("🧠 توليد خطة AI", type="primary", use_container_width=True, key="btn_plan"):
+        if GEMINI_API_KEY:
+            with st.spinner("🤖..."):
+                ans = ask_gemini("خطة علاج: رئيسية=" + main + ", بديل=" + alt + ", مواد=" + str(materials_used) + ". قدم: خطوات + مدة + تكلفة + مضاعفات")
+            st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+        else:
+            st.success("✅ تم توليد الخطة (بدون AI)")
+
+
+def page_pipeline():
+    st.markdown('<div class="section-title">🔄 خط الإنتاج ومقيّمه</div>', unsafe_allow_html=True)
+    steps = [
+        ("1️⃣ الاستشارة والتشخيص", "done"),
+        ("2️⃣ التحضير الرقمي", "done"),
+        ("3️⃣ التصميم CAD/CAM", "active"),
+        ("4️⃣ التصنيع", "pending"),
+        ("5️⃣ التركيب والتسليم", "pending"),
+    ]
+    for name, status in steps:
+        icon = "✅" if status == "done" else "🔄" if status == "active" else "⏳"
+        st.markdown(f'<div class="timeline-step timeline-{status}"><div>{icon}</div><strong>{name}</strong></div>', unsafe_allow_html=True)
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=58,
+        title={'text': "نسبة الإنجاز"},
+        gauge={'bar': {'color': "#00d4ff"}}
+    ))
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def page_comparisons():
+    st.markdown('<div class="section-title">📊 جداول المقارنات</div>', unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["قبل/بعد", "إحصائية"])
+    with tab1:
+        df = pd.DataFrame({
+            "المعيار": ["لون الأسنان", "تناسق الابتسامة", "صحة اللثة", "التناسب", "الثقة"],
+            "قبل": [45, 60, 70, 55, 50],
+            "بعد": [95, 92, 90, 88, 98],
+            "التحسن": ["+111%", "+53%", "+29%", "+60%", "+96%"]
+        })
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name='قبل', x=df['المعيار'], y=df['قبل'], marker_color='#ef4444'))
+        fig.add_trace(go.Bar(name='بعد', x=df['المعيار'], y=df['بعد'], marker_color='#10b981'))
+        fig.update_layout(barmode='group', template='plotly_dark',
+                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+    with tab2:
+        df = st.session_state.patients_df
+        comp = pd.DataFrame({
+            "المعيار": ["عدد الأسنان", "التكلفة", "المدة", "رضا المريض"],
+            "الحد الأدنى": [df['عدد_الأسنان'].min(), df['التكلفة_ريال'].min(),
+                          df['المدة_شهر'].min(), df['رضا_المريض_%'].min()],
+            "الأعلى": [df['عدد_الأسنان'].max(), df['التكلفة_ريال'].max(),
+                      df['المدة_شهر'].max(), df['رضا_المريض_%'].max()],
+            "المتوسط": [df['عدد_الأسنان'].mean(), df['التكلفة_ريال'].mean(),
+                       df['المدة_شهر'].mean(), df['رضا_المريض_%'].mean()]
+        })
+        st.dataframe(comp.round(2), use_container_width=True, hide_index=True)     
 if __name__ == "__main__":
     main()
