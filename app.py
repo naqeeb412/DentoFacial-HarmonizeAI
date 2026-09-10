@@ -843,63 +843,227 @@ def page_upload_logo():
 
 def page_face_analysis():
     st.markdown('<div class="section-title">🧠 تحليل الوجه 468 نقطة</div>', unsafe_allow_html=True)
+    st.caption("رسم كامل لـ 468 نقطة تشريحية + قياسات + تحليل AI")
+    
     if not MEDIAPIPE_AVAILABLE:
-        st.error("MediaPipe غير متاح")
+        st.error("❌ MediaPipe غير متاح — لا يمكن إجراء التحليل")
         return
-    img = image_upload_section("fa", "📸 ارفع صورة الوجه")
-    if img is None:
-        st.info("👆 ارفع صورة")
+    
+    # ═══ رفع الصورة ═══
+    up = st.file_uploader("📸 ارفع صورة الوجه (JPG / PNG)", 
+                          type=["jpg", "png", "jpeg"], 
+                          key="fa_uploader_v2")
+    
+    if up is None:
+        st.info("👆 ارفع صورة لبدء التحليل")
         return
+    
+    # ═══ قراءة الصورة ═══
+    try:
+        current_img = Image.open(up).convert('RGB')
+        st.session_state["fa_current_img"] = current_img
+    except Exception as e:
+        st.error(f"❌ خطأ في قراءة الصورة: {e}")
+        return
+    
+    # ═══ عرض الصورة + زر التحليل ═══
     c1, c2 = st.columns(2)
     with c1:
-        st.image(img, use_container_width=True)
+        st.markdown("##### 📷 الصورة الأصلية")
+        st.image(current_img, use_container_width=True)
+    
     with c2:
-        if st.button("🧠 تحليل 468 نقطة", type="primary", use_container_width=True, key="btn_468"):
-            with st.spinner("⏳..."):
-                lm, ann, data = analyze_face_468(img)
-                if lm is not None:
-                    st.session_state.last_analysis_image = Image.fromarray(ann)
-                    st.session_state.last_analysis_data = data if data else {}
-                    st.rerun()
-                else:
-                    st.error("❌ لم يتم اكتشاف وجه")
-    if st.session_state.get("last_analysis_image"):
-        st.image(st.session_state.last_analysis_image, use_container_width=True)
-        data = st.session_state.last_analysis_data or {}
-        if data:
+        st.markdown("##### ⚙️ التحليل")
+        st.write("")
+        st.write("")
+        # ✅ الزر الرئيسي - واضح وكبير
+        analyze_btn = st.button(
+            "🧠 ابدأ تحليل 468 نقطة", 
+            type="primary", 
+            use_container_width=True, 
+            key="btn_analyze_468_v2"
+        )
+        st.write("")
+        st.write("")
+        # ✅ زر إضافي للتحليل بالذكاء الاصطناعي
+        if GEMINI_API_KEY:
+            ai_btn = st.button(
+                "🤖 تحليل بالذكاء الاصطناعي", 
+                use_container_width=True, 
+                key="btn_ai_468_v2"
+            )
+        else:
+            ai_btn = False
+            st.info("💡 أضف GEMINI_API_KEY لتفعيل تحليل AI")
+    
+    # ═══ تنفيذ التحليل المحلي ═══
+    if analyze_btn:
+        with st.spinner("⏳ جاري تحليل 468 نقطة..."):
+            landmarks, annotated, data = analyze_face_468(current_img)
+            if landmarks is not None and annotated is not None:
+                st.session_state["fa_annotated"] = Image.fromarray(annotated)
+                st.session_state["fa_data"] = data if data else {}
+                st.success("✅ تم التحليل بنجاح!")
+                st.rerun()
+            else:
+                st.error("❌ لم يتم اكتشاف وجه في الصورة — تأكد من:")
+                st.markdown("""
+                - الوجه واضح ومضاء جيداً
+                - الوجه في منتصف الصورة
+                - الصورة بصيغة JPG أو PNG
+                """)
+    
+    # ═══ تنفيذ التحليل بالذكاء الاصطناعي ═══
+    if ai_btn:
+        with st.spinner("🤖 الذكاء الاصطناعي يحلل الصورة..."):
+            ans = ai_analyze_image(
+                current_img, 
+                "حلل هذه الصورة الطبية: صف الأسنان، الابتسامة، تناسق الوجه، النسب الذهبية، وقدم توصيات تجميلية مفصلة."
+            )
+        st.markdown(f'<div class="ai-msg">🤖 <b>تحليل NaqAI:</b><br><br>{ans}</div>', unsafe_allow_html=True)
+    
+    # ═══ عرض النتائج ═══
+    if st.session_state.get("fa_annotated") is not None:
+        st.markdown("---")
+        st.markdown("### 🎯 الصورة مع الرسم التشريحي الكامل")
+        st.image(st.session_state["fa_annotated"], use_container_width=True)
+        
+        data = st.session_state.get("fa_data", {})
+        
+        if data and "error" not in data:
+            # KPIs رئيسية
+            st.markdown("### 📊 النتائج الرئيسية")
             c1, c2, c3, c4 = st.columns(4)
             with c1:
-                st.metric("📍 النقاط", data.get("num_landmarks", 468))
+                st.metric("📍 النقاط المرسومة", data.get("num_landmarks", 468))
             with c2:
-                st.metric("🏆 الدرجة", f"{data.get('overall_score', 0):.1f}%")
+                st.metric("🏆 الدرجة الكلية", f"{data.get('overall_score', 0):.1f}%")
             with c3:
                 st.metric("✅ التقييم", data.get("grade", "-"))
             with c4:
-                st.metric("👤 الوجه", data.get("face_shape", "-"))
+                st.metric("👤 شكل الوجه", data.get("face_shape", "-"))
+            
+            # القياسات التفصيلية
+            st.markdown("### 📐 القياسات التشريحية")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("✨ النسبة الذهبية Φ", f"{data.get('golden_score', 0):.1f}%")
+                st.metric("📐 نسبة الشفاه/الأنف", f"{data.get('golden_ratio', 0):.3f}", 
+                         help="القيمة المثالية: 1.618")
+                st.metric("📏 تناسق الأثلاث", f"{data.get('thirds_score', 0):.1f}%")
+            with c2:
+                st.metric("🎯 تناسق الوجه", f"{data.get('symmetry_score', 0):.1f}%")
+                st.metric("😁 الابتسامة", f"{data.get('smile_score', 0):.1f}%")
+                st.metric("👁️ تناسق العيون", f"{data.get('eye_symmetry', 0):.1f}%")
+            
+            # مخطط بياني
+            st.markdown("### 📊 مخطط النتائج")
             chart = pd.DataFrame({
-                "المعيار": ["ذهبية", "تناسق", "أثلاث", "ابتسامة", "عيون"],
-                "النسبة": [data.get('golden_score', 0), data.get('symmetry_score', 0),
-                          data.get('thirds_score', 0), data.get('smile_score', 0),
-                          data.get('eye_symmetry', 0)]
+                "المعيار": ["النسبة الذهبية", "التناسق", "الأثلاث", "الابتسامة", "العيون"],
+                "النسبة %": [
+                    data.get('golden_score', 0),
+                    data.get('symmetry_score', 0),
+                    data.get('thirds_score', 0),
+                    data.get('smile_score', 0),
+                    data.get('eye_symmetry', 0),
+                ]
             })
-            fig = px.bar(chart, x="المعيار", y="النسبة", template="plotly_dark",
-                         color="النسبة", color_continuous_scale=["#ef4444", "#10b981", "#00d4ff"])
-            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False)
+            fig = px.bar(
+                chart, 
+                x="المعيار", 
+                y="النسبة %",
+                color="النسبة %",
+                template="plotly_dark",
+                color_continuous_scale=["#ef4444", "#f59e0b", "#10b981", "#00d4ff"],
+                range_color=[0, 100]
+            )
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',
+                showlegend=False,
+                height=350
+            )
             st.plotly_chart(fig, use_container_width=True)
+            
+            # أزرار التحميل
+            st.markdown("### 💾 التحميل والتقارير")
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.download_button("⬇️ PNG", img_to_bytes(st.session_state.last_analysis_image),
-                                 "face_468.png", "image/png", use_container_width=True, key="dl_face_png")
+                st.download_button(
+                    "⬇️ تحميل الصورة (PNG)",
+                    img_to_bytes(st.session_state["fa_annotated"]),
+                    f"face_468_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
+                    "image/png",
+                    use_container_width=True,
+                    key="dl_468_png_v2"
+                )
             with c2:
-                st.download_button("⬇️ JSON", json.dumps(data, ensure_ascii=False, indent=2).encode(),
-                                 "analysis.json", "application/json", use_container_width=True, key="dl_face_json")
+                st.download_button(
+                    "⬇️ تحميل التقرير (JSON)",
+                    json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'),
+                    f"analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    "application/json",
+                    use_container_width=True,
+                    key="dl_468_json_v2"
+                )
             with c3:
-                if GEMINI_API_KEY and st.button("🤖 تحليل AI", use_container_width=True, key="btn_ai_face"):
-                    with st.spinner("🤖..."):
-                        ans = ai_analyze_image(img, "حلل هذه الصورة: التناسق، النسب، التوصيات التجميلية")
-                    st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+                html = f"""<!DOCTYPE html>
+                <html dir="rtl"><head><meta charset="UTF-8"><title>تقرير تحليل الوجه 468</title>
+                <style>body{{font-family:Tajawal,sans-serif;padding:20px;background:#f5f5f5}}
+                .container{{max-width:900px;margin:auto;background:white;padding:30px;border-radius:10px}}
+                h1{{color:#00d4ff;text-align:center}} table{{width:100%;border-collapse:collapse;margin:20px 0}}
+                td,th{{padding:10px;border:1px solid #ddd;text-align:right}} th{{background:#00d4ff;color:white}}</style>
+                </head><body><div class="container">
+                <h1>🦷 تقرير تحليل الوجه 468 نقطة</h1>
+                <p><b>التاريخ:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+                <img src="data:image/png;base64,{img_to_b64(st.session_state["fa_annotated"])}" 
+                     style="max-width:100%;border-radius:10px;">
+                <h2>📊 النتائج</h2>
+                <table>
+                <tr><th>المعيار</th><th>القيمة</th></tr>
+                <tr><td>الدرجة الكلية</td><td>{data.get('overall_score', 0):.1f}%</td></tr>
+                <tr><td>التقييم</td><td>{data.get('grade', '-')}</td></tr>
+                <tr><td>شكل الوجه</td><td>{data.get('face_shape', '-')}</td></tr>
+                <tr><td>النسبة الذهبية</td><td>{data.get('golden_score', 0):.1f}%</td></tr>
+                <tr><td>التناسق</td><td>{data.get('symmetry_score', 0):.1f}%</td></tr>
+                <tr><td>الأثلاث</td><td>{data.get('thirds_score', 0):.1f}%</td></tr>
+                <tr><td>الابتسامة</td><td>{data.get('smile_score', 0):.1f}%</td></tr>
+                <tr><td>تناسق العيون</td><td>{data.get('eye_symmetry', 0):.1f}%</td></tr>
+                </table></div></body></html>"""
+                st.download_button(
+                    "⬇️ تحميل التقرير (HTML)",
+                    html.encode('utf-8'),
+                    f"report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    "text/html",
+                    use_container_width=True,
+                    key="dl_468_html_v2"
+                )
+            
+            # NaqAI للإجابة على أسئلة
+            if GEMINI_API_KEY:
+                st.markdown("### 🤖 اطلب تحليل من NaqAI")
+                if st.button("🤖 اطلب تحليل AI مفصل", use_container_width=True, key="btn_ai_face_detailed"):
+                    with st.spinner("🤖 NaqAI يحلل النتائج..."):
+                        prompt = f"""حلل النتائج الوجهية التالية:
+- الدرجة الكلية: {data.get('overall_score', 0):.1f}%
+- التقييم: {data.get('grade', '-')}
+- شكل الوجه: {data.get('face_shape', '-')}
+- النسبة الذهبية: {data.get('golden_score', 0):.1f}%
+- نسبة الشفاه/الأنف: {data.get('golden_ratio', 0):.3f}
+- تناسق الوجه: {data.get('symmetry_score', 0):.1f}%
+- تناسق الأثلاث: {data.get('thirds_score', 0):.1f}%
+- الابتسامة: {data.get('smile_score', 0):.1f}%
+- تناسق العيون: {data.get('eye_symmetry', 0):.1f}%
 
-
+قدم:
+1. تحليل مختصر للحالة
+2. نقاط القوة
+3. الفرص التحسينية
+4. توصيات علاجية محددة"""
+                        ans = ask_gemini(prompt, "تحليل وجهي تجميلي")
+                    st.markdown(f'<div class="ai-msg">🤖 <b>تحليل NaqAI:</b><br><br>{ans}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ لم يتم استخراج القياسات. حاول مرة أخرى بصورة أوضح.")
 def page_golden_ratio():
     st.markdown('<div class="section-title">✨ النسبة الذهبية</div>', unsafe_allow_html=True)
     if not MEDIAPIPE_AVAILABLE:
