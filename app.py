@@ -1559,17 +1559,33 @@ PAGES = {
 def main():
     if "current_page" not in st.session_state:
         st.session_state.current_page = "home"
+    
     if not st.session_state.authenticated:
         auth_page()
-    else:
+        return
+    
+    if st.session_state.current_user is None:
+        st.session_state.authenticated = False
+        st.rerun()
+        return
+    
+    try:
         sidebar_nav()
-        PAGES.get(st.session_state.current_page, page_home)()
-        st.markdown("""
-        <hr style="margin-top:40px;border-color:#334155;">
-        <div style="text-align:center;color:#64748b;font-size:0.8rem;padding:20px;">
-            <strong style="color:#00d4ff;">🦷 DENTAL AI OS v5.0</strong><br>© 2026
-        </div>
-        """, unsafe_allow_html=True)
-
-if __name__ == "__main__":
-    main()
+        page_func = PAGES.get(st.session_state.current_page)
+        if page_func is None:
+            st.warning(f"⚠️ الصفحة '{st.session_state.current_page}' غير موجودة")
+            page_func = page_home
+        page_func()
+    except Exception as e:
+        st.error(f"❌ خطأ في الصفحة: {str(e)}")
+        st.exception(e)
+        if st.button("🏠 العودة للرئيسية"):
+            st.session_state.current_page = "home"
+            st.rerun()
+    
+    st.markdown("""
+    <hr style="margin-top:40px;border-color:#334155;">
+    <div style="text-align:center;color:#64748b;font-size:0.8rem;padding:20px;">
+        <strong style="color:#00d4ff;">🦷 DENTAL AI OS v5.0</strong><br>© 2026
+    </div>
+    """, unsafe_allow_html=True)
