@@ -1807,41 +1807,668 @@ def page_xray():
 #  📄 PAGE: DENTBOOK
 # ============================================================
 def page_dentbook():
-    st.markdown('<div class="section-title">📱 Dentbook</div>', unsafe_allow_html=True)
-    st.caption("الشبكة الاجتماعية الطبية للأطباء")
+    st.markdown('<div class="section-title">📱 Dentbook — الشبكة الاجتماعية الطبية</div>', unsafe_allow_html=True)
     
-    with st.expander("📝 إنشاء منشور جديد", expanded=True):
-        with st.form("dentbook_form", clear_on_submit=True):
-            content = st.text_area("محتوى المنشور", placeholder="شارك حالة طبية أو تحديث...")
-            category = st.selectbox("التصنيف", ["منشور عام", "تحديث صيانة", "حالة سريرية", "نصيحة طبية"])
-            if st.form_submit_button("🚀 نشر"):
-                if content:
-                    st.session_state.dentbook_posts.insert(0, {
-                        "author": st.session_state.current_user["name"],
-                        "content": content,
-                        "category": category,
-                        "time": datetime.now().strftime("%H:%M"),
-                        "likes": 0,
-                        "comments": []
-                    })
-                    st.success("✅ تم النشر!")
+    user = st.session_state.current_user
+    if user is None:
+        return
+    
+    # ═══════════════════════════════════════════════════════════
+    # تهيئة بيانات Dentbook
+    # ═══════════════════════════════════════════════════════════
+    if "fb_posts" not in st.session_state:
+        st.session_state.fb_posts = []
+    if "fb_comments" not in st.session_state:
+        st.session_state.fb_comments = {}
+    if "fb_likes" not in st.session_state:
+        st.session_state.fb_likes = {}
+    if "fb_friends" not in st.session_state:
+        st.session_state.fb_friends = {user["email"]: []}
+    if "fb_friend_requests" not in st.session_state:
+        st.session_state.fb_friend_requests = []
+    if "fb_notifications" not in st.session_state:
+        st.session_state.fb_notifications = []
+    if "fb_stories" not in st.session_state:
+        st.session_state.fb_stories = []
+    if "fb_groups" not in st.session_state:
+        st.session_state.fb_groups = []
+    if "fb_pages" not in st.session_state:
+        st.session_state.fb_pages = []
+    if "fb_saved" not in st.session_state:
+        st.session_state.fb_saved = []
+    if "fb_messages" not in st.session_state:
+        st.session_state.fb_messages = {}
+    if "fb_current_tab" not in st.session_state:
+        st.session_state.fb_current_tab = "feed"
+    if "fb_search" not in st.session_state:
+        st.session_state.fb_search = ""
+    
+    # ═══════════════════════════════════════════════════════════
+    # الشريط العلوي — تنقل مشابه لفيسبوك
+    # ═══════════════════════════════════════════════════════════
+    tabs_data = [
+        ("🏠 الأحدث", "feed"),
+        ("👥 الأصدقاء", "friends"),
+        ("💬 الرسائل", "messages"),
+        ("👥 المجموعات", "groups"),
+        ("📄 الصفحات", "pages"),
+        ("🔖 المحفوظات", "saved"),
+        ("🔔 الإشعارات", "notifications"),
+    ]
+    
+    cols = st.columns(len(tabs_data))
+    for i, (label, key) in enumerate(tabs_data):
+        with cols[i]:
+            is_active = st.session_state.fb_current_tab == key
+            btn_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"dbtab_{key}", use_container_width=True, type=btn_type):
+                st.session_state.fb_current_tab = key
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # ═══════════════════════════════════════════════════════════
+    # عمودان: المحتوى الرئيسي + الشريط الجانبي
+    # ═══════════════════════════════════════════════════════════
+    main_col, side_col = st.columns([2, 1])
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: الأحدث (Feed)
+    # ═══════════════════════════════════════════════════════════
+    if st.session_state.fb_current_tab == "feed":
+        with main_col:
+            # ─── Stories ───
+            st.markdown("### 📸 القصص (Stories)")
+            stories_cols = st.columns(5)
+            
+            with stories_cols[0]:
+                with st.form("story_form", clear_on_submit=True):
+                    story_text = st.text_input("قصة جديدة", placeholder="اكتب هنا...", label_visibility="collapsed", key="story_input")
+                    if st.form_submit_button("➕ إضافة", use_container_width=True):
+                        if story_text.strip():
+                            st.session_state.fb_stories.insert(0, {
+                                "author": user["name"],
+                                "author_email": user["email"],
+                                "text": story_text,
+                                "time": datetime.now().strftime("%H:%M"),
+                                "color": random.choice(["#00d4ff", "#7b2cbf", "#10b981", "#f59e0b", "#ef4444"])
+                            })
+                            st.rerun()
+            
+            for i, story in enumerate(st.session_state.fb_stories[:4]):
+                with stories_cols[i + 1]:
+                    st.markdown(f"""
+                    <div style="background:{story['color']}30;border:2px solid {story['color']};border-radius:12px;padding:12px;height:100px;display:flex;flex-direction:column;justify-content:space-between;">
+                        <div style="font-size:0.7rem;color:#8892b0;">{story['author']}</div>
+                        <div style="font-size:0.85rem;color:#e2e8f0;">{story['text'][:40]}</div>
+                        <div style="font-size:0.65rem;color:#64748b;">{story['time']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("")
+            
+            # ─── إنشاء منشور ───
+            st.markdown("### ✍️ إنشاء منشور")
+            with st.form("fb_post_form", clear_on_submit=True):
+                post_text = st.text_area("ماذا تريد أن تشارك؟", height=100, placeholder="شارك حالة سريرية، نصيحة، صورة...", label_visibility="collapsed")
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    post_category = st.selectbox("التصنيف", 
+                        ["📝 منشور عام", "🦷 حالة سريرية", "💊 نصيحة طبية", "❓ استشارة", "📰 خبر جديد", "🎓 تعليمي"],
+                        key="fb_post_cat")
+                with c2:
+                    post_visibility = st.selectbox("الظهور", 
+                        ["🌐 عام", "👥 الأصدقاء", "🔒 خاص"],
+                        key="fb_post_vis")
+                with c3:
+                    post_mood = st.selectbox("الشعور", 
+                        ["😊 عادي", "😃 سعيد", "😎 محترف", "🤔 مفكر", "💪 متحمس"],
+                        key="fb_post_mood")
+                
+                post_image = st.file_uploader("📷 صورة (اختياري)", type=["jpg", "jpeg", "png"], key="fb_post_img")
+                
+                if st.form_submit_button("🚀 نشر", use_container_width=True, type="primary"):
+                    if post_text.strip():
+                        img_b64 = None
+                        if post_image:
+                            img = Image.open(post_image)
+                            buf = BytesIO()
+                            img.save(buf, format="PNG")
+                            img_b64 = base64.b64encode(buf.getvalue()).decode()
+                        
+                        post_id = f"post_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+                        st.session_state.fb_posts.insert(0, {
+                            "id": post_id,
+                            "author": user["name"],
+                            "author_email": user["email"],
+                            "author_specialty": user.get("specialty", ""),
+                            "text": post_text,
+                            "category": post_category,
+                            "visibility": post_visibility,
+                            "mood": post_mood,
+                            "image": img_b64,
+                            "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "likes": [],
+                            "comments": [],
+                            "shares": 0,
+                            "saved_by": []
+                        })
+                        st.success("✅ تم النشر بنجاح!")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ اكتب شيئاً أولاً")
+            
+            st.markdown("---")
+            
+            # ─── عرض المنشورات ───
+            if not st.session_state.fb_posts:
+                st.info("📭 لا توجد منشورات بعد. كن أول من ينشر!")
+            else:
+                for post in st.session_state.fb_posts:
+                    post_id = post["id"]
+                    
+                    # ─── رأس المنشور ───
+                    c_av, c_info, c_menu = st.columns([1, 6, 1])
+                    with c_av:
+                        st.markdown(f"""
+                        <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2cbf);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700;">
+                            {post['author'][0] if post['author'] else '?'}
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with c_info:
+                        st.markdown(f"""
+                        <div style="line-height:1.4;">
+                            <strong style="color:#00d4ff;font-size:1rem;">{post['author']}</strong>
+                            <span style="color:#8892b0;font-size:0.75rem;"> · {post.get('author_specialty','')}</span><br>
+                            <span style="color:#64748b;font-size:0.7rem;">{post['time']} · {post.get('category','')} · {post.get('mood','')} · {post.get('visibility','')}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with c_menu:
+                        menu_action = st.selectbox("", ["⋯", "🔖 حفظ", "🔗 نسخ الرابط", "🚫 إبلاغ", "🗑️ حذف"],
+                                                   key=f"menu_{post_id}", label_visibility="collapsed")
+                        if menu_action == "🗑️ حذف" and post.get("author_email") == user["email"]:
+                            if st.button("تأكيد الحذف", key=f"del_confirm_{post_id}"):
+                                st.session_state.fb_posts.remove(post)
+                                st.rerun()
+                        elif menu_action == "🔖 حفظ":
+                            if post_id not in st.session_state.fb_saved:
+                                st.session_state.fb_saved.append(post_id)
+                                st.toast("✅ تم الحفظ")
+                        elif menu_action == "🔗 نسخ الرابط":
+                            st.toast("🔗 تم نسخ الرابط")
+                        elif menu_action == "🚫 إبلاغ":
+                            st.toast("🚫 تم الإبلاغ")
+                    
+                    # ─── محتوى المنشور ───
+                    st.markdown(f"""
+                    <div style="background:rgba(255,255,255,0.03);padding:15px;border-radius:10px;margin:10px 0;border-right:3px solid #00d4ff;">
+                        <p style="color:#e2e8f0;line-height:1.7;margin:0;font-size:0.95rem;">{post['text']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # ─── صورة المنشور ───
+                    if post.get("image"):
+                        st.markdown(f'<img src="data:image/png;base64,{post['image']}" style="max-width:100%;border-radius:10px;margin:8px 0;">', unsafe_allow_html=True)
+                    
+                    # ─── أزرار التفاعل ───
+                    c1, c2, c3, c4 = st.columns(4)
+                    
+                    liked = user["email"] in post.get("likes", [])
+                    
+                    with c1:
+                        if st.button(
+                            f"{'❤️' if liked else '🤍'} {len(post.get('likes', []))} إعجاب",
+                            key=f"like_{post_id}",
+                            use_container_width=True
+                        ):
+                            if liked:
+                                post["likes"].remove(user["email"])
+                            else:
+                                post["likes"].append(user["email"])
+                                # إشعار
+                                if post.get("author_email") != user["email"]:
+                                    st.session_state.fb_notifications.append({
+                                        "to": post["author_email"],
+                                        "from": user["name"],
+                                        "type": "like",
+                                        "text": f"أعجب بمنشورك",
+                                        "time": datetime.now().strftime("%H:%M")
+                                    })
+                            st.rerun()
+                    
+                    with c2:
+                        comments_count = len(post.get("comments", []))
+                        if st.button(f"💬 {comments_count} تعليق", key=f"cmtbtn_{post_id}", use_container_width=True):
+                            st.session_state[f"show_comments_{post_id}"] = not st.session_state.get(f"show_comments_{post_id}", False)
+                            st.rerun()
+                    
+                    with c3:
+                        if st.button(f"🔗 {post.get('shares', 0)} مشاركة", key=f"share_{post_id}", use_container_width=True):
+                            post["shares"] = post.get("shares", 0) + 1
+                            st.toast("🔗 تم مشاركة المنشور")
+                            st.rerun()
+                    
+                    with c4:
+                        saved = post_id in st.session_state.fb_saved
+                        if st.button(f"{'🔖' if saved else '📑'} {'محفوظ' if saved else 'حفظ'}", 
+                                     key=f"save_{post_id}", use_container_width=True):
+                            if saved:
+                                st.session_state.fb_saved.remove(post_id)
+                            else:
+                                st.session_state.fb_saved.append(post_id)
+                            st.rerun()
+                    
+                    # ─── التعليقات ───
+                    if st.session_state.get(f"show_comments_{post_id}", False):
+                        st.markdown("---")
+                        
+                        # عرض التعليقات
+                        for comment in post.get("comments", []):
+                            st.markdown(f"""
+                            <div style="background:rgba(0,212,255,0.05);padding:10px;border-radius:8px;margin:6px 0;border-right:2px solid #64ffda;">
+                                <strong style="color:#64ffda;font-size:0.85rem;">{comment['author']}</strong>
+                                <span style="color:#64748b;font-size:0.7rem;"> · {comment['time']}</span>
+                                <p style="color:#e2e8f0;margin:4px 0 0;font-size:0.9rem;">{comment['text']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # إضافة تعليق
+                        with st.form(f"comment_form_{post_id}", clear_on_submit=True):
+                            c1, c2 = st.columns([4, 1])
+                            with c1:
+                                new_comment = st.text_input("✍️ اكتب تعليقاً...", 
+                                                            label_visibility="collapsed", 
+                                                            key=f"cinput_{post_id}")
+                            with c2:
+                                if st.form_submit_button("📨", use_container_width=True):
+                                    if new_comment.strip():
+                                        post.setdefault("comments", []).append({
+                                            "author": user["name"],
+                                            "author_email": user["email"],
+                                            "text": new_comment,
+                                            "time": datetime.now().strftime("%H:%M")
+                                        })
+                                        if post.get("author_email") != user["email"]:
+                                            st.session_state.fb_notifications.append({
+                                                "to": post["author_email"],
+                                                "from": user["name"],
+                                                "type": "comment",
+                                                "text": f"علق على منشورك",
+                                                "time": datetime.now().strftime("%H:%M")
+                                            })
+                                        st.rerun()
+                    
+                    st.markdown("---")
+        
+        # ═══════════════════════════════════════════════════════════
+        # الشريط الجانبي
+        # ═══════════════════════════════════════════════════════════
+        with side_col:
+            # ─── الملف الشخصي ───
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,rgba(0,212,255,0.1),rgba(123,44,191,0.1));border-radius:12px;padding:15px;text-align:center;margin-bottom:15px;">
+                <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2cbf);display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;font-weight:700;margin:0 auto 10px;">
+                    {user['name'][0] if user['name'] else '?'}
+                </div>
+                <div style="font-weight:700;color:#00d4ff;">{user['name']}</div>
+                <div style="font-size:0.7rem;color:#8892b0;">{user.get('specialty','')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # ─── إحصائيات ───
+            st.markdown("### 📊 إحصائياتك")
+            my_posts = [p for p in st.session_state.fb_posts if p.get("author_email") == user["email"]]
+            total_likes = sum(len(p.get("likes", [])) for p in my_posts)
+            total_comments = sum(len(p.get("comments", [])) for p in my_posts)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("📝 منشورات", len(my_posts))
+            with c2:
+                st.metric("❤️ إعجابات", total_likes)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("💬 تعليقات", total_comments)
+            with c2:
+                st.metric("👥 أصدقاء", len(st.session_state.fb_friends.get(user["email"], [])))
+            
+            st.markdown("---")
+            
+            # ─── طلبات الصداقة ───
+            incoming_requests = [r for r in st.session_state.fb_friend_requests 
+                                if r["to"] == user["email"] and r["status"] == "pending"]
+            if incoming_requests:
+                st.markdown(f"### 👥 طلبات الصداقة ({len(incoming_requests)})")
+                for req in incoming_requests:
+                    st.markdown(f"""
+                    <div style="background:rgba(255,255,255,0.05);padding:10px;border-radius:8px;margin:4px 0;">
+                        <strong style="color:#00d4ff;">{req['from_name']}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("✅ قبول", key=f"acc_{req['from']}", use_container_width=True):
+                            req["status"] = "accepted"
+                            st.session_state.fb_friends.setdefault(user["email"], []).append(req["from"])
+                            st.session_state.fb_friends.setdefault(req["from"], []).append(user["email"])
+                            st.toast("✅ تم قبول الصداقة")
+                            st.rerun()
+                    with c2:
+                        if st.button("❌ رفض", key=f"rej_{req['from']}", use_container_width=True):
+                            req["status"] = "rejected"
+                            st.rerun()
+                st.markdown("---")
+            
+            # ─── الأصدقاء ───
+            st.markdown("### 👥 أصدقاؤك")
+            my_friends = st.session_state.fb_friends.get(user["email"], [])
+            if my_friends:
+                for friend_email in my_friends[:5]:
+                    friend_data = st.session_state.users_db.get(friend_email, {})
+                    if friend_data:
+                        st.markdown(f"""
+                        <div style="display:flex;align-items:center;gap:8px;padding:6px;background:rgba(255,255,255,0.03);border-radius:8px;margin:3px 0;">
+                            <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#00d4ff,#7b2cbf);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;">
+                                {friend_data.get('name','?')[0]}
+                            </div>
+                            <div style="font-size:0.85rem;color:#e2e8f0;">{friend_data.get('name','')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("لا أصدقاء بعد")
+            
+            st.markdown("---")
+            
+            # ─── أشخاص قد تعرفهم ───
+            st.markdown("### 🌟 أشخاص قد تعرفهم")
+            all_users = [u for e, u in st.session_state.users_db.items() 
+                        if e != user["email"] and e not in my_friends]
+            for other in all_users[:3]:
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    st.markdown(f"""
+                    <div style="font-size:0.85rem;color:#e2e8f0;">{other.get('name','')}</div>
+                    <div style="font-size:0.7rem;color:#8892b0;">{other.get('specialty','')}</div>
+                    """, unsafe_allow_html=True)
+                with c2:
+                    if st.button("➕", key=f"add_friend_{other['email']}", use_container_width=True):
+                        st.session_state.fb_friend_requests.append({
+                            "from": user["email"],
+                            "to": other["email"],
+                            "from_name": user["name"],
+                            "to_name": other.get("name", ""),
+                            "status": "pending",
+                            "time": datetime.now().strftime("%H:%M")
+                        })
+                        st.toast(f"✅ طلب صداقة أُرسل إلى {other.get('name','')}")
+                        st.rerun()
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: الأصدقاء
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "friends":
+        with main_col:
+            st.markdown("### 👥 إدارة الأصدقاء")
+            
+            tab1, tab2, tab3 = st.tabs(["👥 أصدقائي", "📨 الطلبات", "🔍 بحث"])
+            
+            with tab1:
+                my_friends = st.session_state.fb_friends.get(user["email"], [])
+                if not my_friends:
+                    st.info("لا أصدقاء بعد")
+                for friend_email in my_friends:
+                    friend_data = st.session_state.users_db.get(friend_email, {})
+                    if friend_data:
+                        st.markdown(f"""
+                        <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <strong style="color:#00d4ff;">{friend_data.get('name','')}</strong><br>
+                                <small style="color:#8892b0;">{friend_data.get('specialty','')}</small>
+                            </div>
+                            <div style="color:#10b981;">🟢 متصل</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            
+            with tab2:
+                incoming = [r for r in st.session_state.fb_friend_requests 
+                           if r["to"] == user["email"] and r["status"] == "pending"]
+                outgoing = [r for r in st.session_state.fb_friend_requests 
+                           if r["from"] == user["email"] and r["status"] == "pending"]
+                
+                st.markdown(f"#### 📥 واردة ({len(incoming)})")
+                for req in incoming:
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        st.markdown(f"**{req['from_name']}**")
+                    with c2:
+                        if st.button("✅ قبول", key=f"facc_{req['from']}"):
+                            req["status"] = "accepted"
+                            st.session_state.fb_friends.setdefault(user["email"], []).append(req["from"])
+                            st.session_state.fb_friends.setdefault(req["from"], []).append(user["email"])
+                            st.rerun()
+                    with c3:
+                        if st.button("❌ رفض", key=f"frej_{req['from']}"):
+                            req["status"] = "rejected"
+                            st.rerun()
+                
+                st.markdown(f"#### 📤 صادرة ({len(outgoing)})")
+                for req in outgoing:
+                    st.markdown(f"⏳ {req.get('to_name', req['to'])}")
+            
+            with tab3:
+                search_query = st.text_input("🔍 ابحث عن أطباء", key="friend_search")
+                if search_query:
+                    for email, other in st.session_state.users_db.items():
+                        if email != user["email"]:
+                            if search_query.lower() in other.get("name", "").lower():
+                                st.markdown(f"""
+                                <div class="card">
+                                    <strong style="color:#00d4ff;">{other.get('name','')}</strong><br>
+                                    <small style="color:#8892b0;">{other.get('specialty','')} — {email}</small>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                if st.button(f"➕ إضافة", key=f"search_add_{email}"):
+                                    st.session_state.fb_friend_requests.append({
+                                        "from": user["email"],
+                                        "to": email,
+                                        "from_name": user["name"],
+                                        "to_name": other.get("name", ""),
+                                        "status": "pending",
+                                        "time": datetime.now().strftime("%H:%M")
+                                    })
+                                    st.toast("✅ أُرسل طلب الصداقة")
+                                    st.rerun()
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: الرسائل
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "messages":
+        with main_col:
+            st.markdown("### 💬 الرسائل الخاصة")
+            
+            my_friends = st.session_state.fb_friends.get(user["email"], [])
+            
+            if not my_friends:
+                st.info("👥 أضف أصدقاء أولاً لإرسال الرسائل")
+            else:
+                # اختيار الصديق
+                friend_options = {}
+                for fe in my_friends:
+                    fd = st.session_state.users_db.get(fe, {})
+                    if fd:
+                        friend_options[fd.get("name", fe)] = fe
+                
+                if friend_options:
+                    selected_name = st.selectbox("اختر صديقاً", list(friend_options.keys()), key="msg_friend")
+                    selected_email = friend_options[selected_name]
+                    
+                    # محادثة
+                    conv_key = tuple(sorted([user["email"], selected_email]))
+                    if conv_key not in st.session_state.fb_messages:
+                        st.session_state.fb_messages[conv_key] = []
+                    
+                    # عرض الرسائل
+                    st.markdown(f"#### 💬 المحادثة مع {selected_name}")
+                    messages_container = st.container()
+                    with messages_container:
+                        for msg in st.session_state.fb_messages[conv_key]:
+                            is_mine = msg["from"] == user["email"]
+                            align = "flex-end" if is_mine else "flex-start"
+                            bg = "#00d4ff" if is_mine else "rgba(255,255,255,0.1)"
+                            color = "#000" if is_mine else "#e2e8f0"
+                            st.markdown(f"""
+                            <div style="display:flex;justify-content:{align};margin:4px 0;">
+                                <div style="max-width:70%;padding:8px 14px;border-radius:12px;background:{bg};color:{color};">
+                                    <div style="font-size:0.9rem;">{msg['text']}</div>
+                                    <div style="font-size:0.65rem;opacity:0.7;">{msg['time']}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    # إرسال رسالة
+                    with st.form("fb_msg_form", clear_on_submit=True):
+                        c1, c2 = st.columns([4, 1])
+                        with c1:
+                            new_msg = st.text_input("اكتب رسالة...", label_visibility="collapsed", key="fb_msg_input")
+                        with c2:
+                            if st.form_submit_button("📨 إرسال", use_container_width=True):
+                                if new_msg.strip():
+                                    st.session_state.fb_messages[conv_key].append({
+                                        "from": user["email"],
+                                        "text": new_msg,
+                                        "time": datetime.now().strftime("%H:%M")
+                                    })
+                                    st.rerun()
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: المجموعات
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "groups":
+        with main_col:
+            st.markdown("### 👥 المجموعات")
+            
+            with st.expander("➕ إنشاء مجموعة جديدة", expanded=False):
+                with st.form("group_form", clear_on_submit=True):
+                    group_name = st.text_input("اسم المجموعة")
+                    group_desc = st.text_area("الوصف")
+                    group_type = st.selectbox("النوع", ["🌐 عامة", "🔒 خاصة", "🤫 سرية"])
+                    if st.form_submit_button("🚀 إنشاء", use_container_width=True):
+                        if group_name.strip():
+                            st.session_state.fb_groups.append({
+                                "name": group_name,
+                                "desc": group_desc,
+                                "type": group_type,
+                                "admin": user["name"],
+                                "admin_email": user["email"],
+                                "members": [user["email"]],
+                                "posts": [],
+                                "time": datetime.now().strftime("%Y-%m-%d")
+                            })
+                            st.success("✅ تم إنشاء المجموعة")
+                            st.rerun()
+            
+            for group in st.session_state.fb_groups:
+                st.markdown(f"""
+                <div class="card">
+                    <h4 style="color:#00d4ff;">{group['name']} {group['type']}</h4>
+                    <p style="color:#8892b0;">{group['desc']}</p>
+                    <small>👥 {len(group['members'])} عضو — أنشأها: {group['admin']}</small>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: الصفحات
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "pages":
+        with main_col:
+            st.markdown("### 📄 الصفحات")
+            
+            with st.expander("➕ إنشاء صفحة جديدة", expanded=False):
+                with st.form("page_form", clear_on_submit=True):
+                    page_name = st.text_input("اسم الصفحة")
+                    page_category = st.selectbox("التصنيف", ["🦷 عيادة", "💊 شركة أدوية", "📚 تعليم", "🎓 جامعة", "🤝 منظمة"])
+                    page_desc = st.text_area("الوصف")
+                    if st.form_submit_button("🚀 إنشاء", use_container_width=True):
+                        if page_name.strip():
+                            st.session_state.fb_pages.append({
+                                "name": page_name,
+                                "category": page_category,
+                                "desc": page_desc,
+                                "owner": user["name"],
+                                "owner_email": user["email"],
+                                "likes": 0,
+                                "followers": [],
+                                "time": datetime.now().strftime("%Y-%m-%d")
+                            })
+                            st.success("✅ تم إنشاء الصفحة")
+                            st.rerun()
+            
+            for page in st.session_state.fb_pages:
+                st.markdown(f"""
+                <div class="card">
+                    <h4 style="color:#00d4ff;">{page['name']} {page['category']}</h4>
+                    <p style="color:#8892b0;">{page['desc']}</p>
+                    <small>👍 {page['likes']} إعجاب — {len(page['followers'])} متابع</small>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"👍 إعجاب", key=f"pagelike_{page['name']}"):
+                    page["likes"] += 1
                     st.rerun()
     
-    for post in st.session_state.dentbook_posts[:10]:
-        st.markdown(f"""
-        <div class="card">
-            <div style="display:flex; justify-content:space-between;">
-                <div><strong>{post['author']}</strong> <span style="color:#8892b0;font-size:0.8rem;">{post['time']}</span></div>
-                <span style="background:rgba(0,212,255,0.1);padding:2px 12px;border-radius:12px;font-size:0.7rem;">{post['category']}</span>
-            </div>
-            <p style="margin-top:8px;">{post['content']}</p>
-            <div style="display:flex; gap:12px; font-size:0.8rem; color:#8892b0;">
-                <span>❤️ {post['likes']}</span>
-                <span>💬 {len(post['comments'])}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
+    # ═══════════════════════════════════════════════════════════
+    # TAB: المحفوظات
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "saved":
+        with main_col:
+            st.markdown("### 🔖 المنشورات المحفوظة")
+            
+            saved_posts = [p for p in st.session_state.fb_posts 
+                          if p["id"] in st.session_state.fb_saved]
+            
+            if not saved_posts:
+                st.info("📭 لا منشورات محفوظة")
+            for post in saved_posts:
+                st.markdown(f"""
+                <div class="post-card">
+                    <strong style="color:#00d4ff;">{post['author']}</strong>
+                    <small style="color:#64748b;"> — {post['time']}</small>
+                    <p style="color:#e2e8f0;">{post['text']}</p>
+                    <small>❤️ {len(post.get('likes', []))} — 💬 {len(post.get('comments', []))}</small>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"🗑️ إزالة من المحفوظات", key=f"unsave_{post['id']}"):
+                    st.session_state.fb_saved.remove(post["id"])
+                    st.rerun()
+    
+    # ═══════════════════════════════════════════════════════════
+    # TAB: الإشعارات
+    # ═══════════════════════════════════════════════════════════
+    elif st.session_state.fb_current_tab == "notifications":
+        with main_col:
+            st.markdown("### 🔔 الإشعارات")
+            
+            my_notifs = [n for n in st.session_state.fb_notifications 
+                        if n.get("to") == user["email"]]
+            
+            if not my_notifs:
+                st.info("📭 لا إشعارات")
+            else:
+                for notif in reversed(my_notifs):
+                    icon = {"like": "❤️", "comment": "💬", "friend": "👥", "message": "📨"}.get(notif.get("type"), "🔔")
+                    st.markdown(f"""
+                    <div class="card">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="font-size:1.5rem;">{icon}</div>
+                            <div>
+                                <strong style="color:#00d4ff;">{notif.get('from','')}</strong>
+                                <span style="color:#e2e8f0;"> {notif.get('text','')}</span><br>
+                                <small style="color:#64748b;">{notif.get('time','')}</small>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 # ============================================================
 #  📄 PAGE: FRIENDS
 # ============================================================
