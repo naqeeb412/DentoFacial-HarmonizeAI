@@ -574,3 +574,14 @@ def auth_page():
                         st.success(msg)
                     else:
                         st.error(msg)
+
+def main():
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "home"
+    if not st.session_state.authenticated:
+        auth_page()
+        return
+    st.success("✅ تم تسجيل الدخول! باقي الأقسام ستُضاف في الأجزاء التالية.")
+
+if __name__ == "__main__":
+    main()
