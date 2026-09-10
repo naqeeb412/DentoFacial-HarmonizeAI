@@ -2010,8 +2010,7 @@ def page_dentbook():
                     
                     # ─── صورة المنشور ───
                     if post.get("image"):
-                        st.markdown(f'<img src="data:image/png;base64,{post['image']}" style="max-width:100%;border-radius:10px;margin:8px 0;">', unsafe_allow_html=True)
-                    
+                        st.markdown(f'<img src="data:image/png;base64,{post["image"]}" style="max-width:100%;border-radius:10px;margin:8px 0;">', unsafe_allow_html=True)
                     # ─── أزرار التفاعل ───
                     c1, c2, c3, c4 = st.columns(4)
                     
