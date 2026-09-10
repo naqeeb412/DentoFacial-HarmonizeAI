@@ -1451,6 +1451,380 @@ def page_comparisons():
             "المتوسط": [df['عدد_الأسنان'].mean(), df['التكلفة_ريال'].mean(),
                        df['المدة_شهر'].mean(), df['رضا_المريض_%'].mean()]
         })
-        st.dataframe(comp.round(2), use_container_width=True, hide_index=True)     
+        st.dataframe(comp.round(2), use_container_width=True, hide_index=True)  
+        
+def page_multidisciplinary():
+    st.markdown('<div class="section-title">👥 فريق متعدد التخصصات</div>', unsafe_allow_html=True)
+    for sp in st.session_state.specialists_team:
+        status = "🟢 متصل" if sp.get("online") else "🔴 غير متصل"
+        st.markdown(f'<div class="card"><strong style="color:#00d4ff;">{sp["name"]}</strong> — {sp["specialty"]} ({sp["role"]}) — {status} — {sp.get("cases", 0)} حالة</div>', unsafe_allow_html=True)
+    with st.form("add_spec"):
+        c1, c2 = st.columns(2)
+        with c1:
+            n = st.text_input("الاسم")
+            sp_name = st.text_input("التخصص")
+        with c2:
+            r = st.selectbox("الدور", ["استشاري", "أخصائي", "طبيب مقيم"])
+        if st.form_submit_button("➕ إضافة عضو", use_container_width=True):
+            if n and sp_name:
+                st.session_state.specialists_team.append({
+                    "name": n, "specialty": sp_name, "role": r,
+                    "online": True, "cases": 0
+                })
+                st.success("✅ تمت الإضافة")
+                st.rerun()
+
+
+def page_discussion_forum():
+    st.markdown('<div class="section-title">🗣️ منتدى النقاشات</div>', unsafe_allow_html=True)
+    with st.form("forum_form", clear_on_submit=True):
+        title = st.text_input("عنوان السؤال")
+        body = st.text_area("التفاصيل")
+        if st.form_submit_button("🚀 نشر السؤال", use_container_width=True):
+            if title and body:
+                st.session_state.discussion_forum.insert(0, {
+                    "title": title,
+                    "body": body,
+                    "asked_by": st.session_state.current_user["name"],
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
+                st.success("✅ تم النشر")
+                st.rerun()
+    st.markdown("### الأسئلة المطروحة")
+    for i, q in enumerate(st.session_state.discussion_forum):
+        st.markdown(f'<div class="card"><h4 style="color:#00d4ff;">{q["title"]}</h4><p>{q["body"]}</p><small style="color:#64748b;">👤 {q["asked_by"]} — {q["time"]}</small></div>', unsafe_allow_html=True)
+        if GEMINI_API_KEY:
+            if st.button("🤖 اطلب إجابة AI", key=f"ai_ans_{i}", use_container_width=True):
+                with st.spinner("🤖..."):
+                    ans = ask_gemini("أجب عن سؤال طبي: " + q['title'] + " - " + q['body'])
+                st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+
+
+def page_messages():
+    st.markdown('<div class="section-title">💬 المراسلات</div>', unsafe_allow_html=True)
+    for m in st.session_state.messages[-20:]:
+        st.markdown(f'<div class="card"><strong>{m["sender"]}:</strong> {m["text"]}</div>', unsafe_allow_html=True)
+    with st.form("msg_form", clear_on_submit=True):
+        t = st.text_input("رسالة")
+        if st.form_submit_button("📨 إرسال"):
+            if t:
+                st.session_state.messages.append({
+                    "sender": st.session_state.current_user["name"],
+                    "text": t
+                })
+                st.rerun()
+
+
+def page_lab_chat():
+    st.markdown('<div class="section-title">🧪 التواصل مع المختبر</div>', unsafe_allow_html=True)
+    for m in st.session_state.lab_messages[-10:]:
+        st.markdown(f'<div class="card"><strong>{m["sender"]}:</strong> {m["text"]}</div>', unsafe_allow_html=True)
+    with st.form("lab_form", clear_on_submit=True):
+        t = st.text_input("رسالة للمختبر")
+        if st.form_submit_button("📨 إرسال"):
+            if t:
+                st.session_state.lab_messages.append({
+                    "sender": st.session_state.current_user["name"],
+                    "text": t
+                })
+                st.rerun()
+
+
+def page_global_platform():
+    st.markdown('<div class="section-title">🌍 المنصة العالمية</div>', unsafe_allow_html=True)
+    st.caption("5 مراحل علاجية موحدة | حالات عالمية")
+    stages = [
+        ("1️⃣ التحضير والتصوير", "done"),
+        ("2️⃣ التشخيص الرقمي بالـ AI", "done"),
+        ("3️⃣ التصميم CAD", "active"),
+        ("4️⃣ التصنيع CAM", "pending"),
+        ("5️⃣ التركيب والمتابعة", "pending"),
+    ]
+    for name, status in stages:
+        icon = "✅" if status == "done" else "🔄" if status == "active" else "⏳"
+        st.markdown(f'<div class="timeline-step timeline-{status}"><div>{icon}</div><strong>{name}</strong></div>', unsafe_allow_html=True)
+    cases = pd.DataFrame({
+        "الدولة": ["اليمن", "السعودية", "الإمارات", "مصر", "الأردن"],
+        "الحالات": [24, 45, 32, 18, 12],
+        "نسبة النجاح": ["94%", "96%", "92%", "88%", "95%"]
+    })
+    st.dataframe(cases, use_container_width=True, hide_index=True)
+
+
+def page_systems_used():
+    st.markdown('<div class="section-title">🔌 الأنظمة المستخدمة</div>', unsafe_allow_html=True)
+    st.caption("تكامل مع الأنظمة الخارجية")
+    systems = [
+        ("Meshy AI", "توليد 3D من نص", "https://www.meshy.ai", "🟢"),
+        ("Blender", "تصميم 3D احترافي", "https://www.blender.org", "🟢"),
+        ("Exocad", "CAD/CAM سني", "https://exocad.com", "🟢"),
+        ("3Shape", "مسح رقمي", "https://www.3shape.com", "🟡"),
+        ("AI Studios", "فيديو AI", "https://www.aistudios.com", "🟢"),
+        ("Gemini AI", "مساعد ذكي", "https://ai.google.dev", "🟢"),
+    ]
+    for name, desc, url, status in systems:
+        st.markdown(f'<div class="card"><strong style="color:#00d4ff;">{name}</strong> — {desc} {status} <a href="{url}" target="_blank">🔗</a></div>', unsafe_allow_html=True)
+
+
+def page_analytics():
+    st.markdown('<div class="section-title">📊 التحليلات والمقارنات</div>', unsafe_allow_html=True)
+    df = st.session_state.patients_df
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(df)}</div><div class="metric-label">الحالات</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{df["التكلفة_ريال"].sum():,}</div><div class="metric-label">الإيرادات</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{df["رضا_المريض_%"].mean():.1f}%</div><div class="metric-label">الرضا</div></div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{df["المدة_شهر"].mean():.1f}</div><div class="metric-label">المدة</div></div>', unsafe_allow_html=True)
+    st.markdown("### 📝 جدول البيانات التفاعلي")
+    edited = st.data_editor(df, num_rows="dynamic", use_container_width=True, hide_index=True, key="analytics_editor")
+    st.session_state.patients_df = edited
+    st.markdown("### 📈 الرسوم البيانية")
+    fig = px.bar(
+        edited.groupby('نوع_العلاج')['التكلفة_ريال'].sum().reset_index(),
+        x='نوع_العلاج', y='التكلفة_ريال',
+        template='plotly_dark',
+        title='التكاليف حسب نوع العلاج',
+        color='نوع_العلاج'
+    )
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def page_ads_management():
+    st.markdown('<div class="section-title">📢 إدارة الإعلانات</div>', unsafe_allow_html=True)
+    tab1, tab2, tab3 = st.tabs(["📱 داخلي", "🌐 خارجي", "📤 إرسال"])
+    with tab1:
+        with st.form("internal_ad"):
+            title = st.text_input("عنوان الإعلان")
+            content = st.text_area("المحتوى")
+            prio = st.selectbox("الأولوية", ["عادي", "مهم", "عاجل"])
+            if st.form_submit_button("📢 نشر داخلي", use_container_width=True):
+                st.session_state.internal_ads.append({
+                    "title": title, "content": content,
+                    "prio": prio,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                })
+                st.success("✅ تم النشر")
+                st.rerun()
+        for ad in st.session_state.internal_ads:
+            st.markdown(f'<div class="card"><strong style="color:#00d4ff;">{ad["title"]}</strong> <span class="badge badge-blue">{ad["prio"]}</span><p>{ad["content"]}</p></div>', unsafe_allow_html=True)
+    with tab2:
+        with st.form("external_ad"):
+            ext_title = st.text_input("عنوان الإعلان الخارجي")
+            ext_content = st.text_area("المحتوى")
+            platforms = st.multiselect("المنصات", ["Facebook", "Instagram", "Twitter", "LinkedIn", "TikTok", "WhatsApp"])
+            if st.form_submit_button("🌐 نشر خارجي", use_container_width=True):
+                st.session_state.external_ads.append({
+                    "title": ext_title, "content": ext_content,
+                    "platforms": platforms
+                })
+                st.success(f"✅ سيتم النشر على {len(platforms)} منصة")
+                st.rerun()
+        for ad in st.session_state.external_ads:
+            badges = " ".join([f'<span class="badge badge-blue">{p}</span>' for p in ad.get('platforms', [])])
+            st.markdown(f'<div class="card"><strong style="color:#00d4ff;">{ad["title"]}</strong><br><p>{ad["content"]}</p>{badges}</div>', unsafe_allow_html=True)
+    with tab3:
+        st.markdown("### 📱 إرسال SMS")
+        c1, c2 = st.columns(2)
+        with c1:
+            phones = st.text_area("أرقام الهواتف (سطر لكل رقم)")
+        with c2:
+            message = st.text_area("نص الرسالة")
+        if st.button("📱 إرسال SMS", use_container_width=True, key="btn_sms"):
+            st.success(f"✅ تم إرسال {len(phones.splitlines())} رسالة (محاكاة)")
+        st.markdown("### 📧 إرسال Email")
+        c1, c2 = st.columns(2)
+        with c1:
+            emails = st.text_area("البريد الإلكتروني")
+        with c2:
+            subject = st.text_input("الموضوع")
+            body = st.text_area("المحتوى")
+        if st.button("📧 إرسال Email", use_container_width=True, key="btn_email"):
+            st.success("✅ تم إرسال البريد (محاكاة)")
+
+
+def page_subscriptions():
+    st.markdown('<div class="section-title">👑 خطط الاشتراك</div>', unsafe_allow_html=True)
+    plans = [
+        ("🆓 تجريبي", "$0", ["3 مرضى", "تحليل أساسي"], False),
+        ("⭐ شهري", "$99", ["غير محدود", "تحليل AI", "دعم فني"], True),
+        ("🌟 سنوي", "$999", ["جميع الميزات", "دعم أولوي", "تدريب"], False),
+    ]
+    cols = st.columns(3)
+    for i, (name, price, feats, featured) in enumerate(plans):
+        with cols[i]:
+            border = "border:2px solid #00d4ff;" if featured else ""
+            feats_html = "".join([f'<div style="color:#8892b0;">✓ {f}</div>' for f in feats])
+            st.markdown(f'<div class="card" style="text-align:center;{border}"><h4>{name}</h4><div style="font-size:2rem;font-weight:800;color:#00d4ff;">{price}</div>{feats_html}</div>', unsafe_allow_html=True)
+            if st.button("اشترك", key=f"sub_btn_{i}", use_container_width=True):
+                st.success(f"🎉 تم تفعيل {name}!")
+
+
+def page_reports():
+    st.markdown('<div class="section-title">📄 التقارير</div>', unsafe_allow_html=True)
+    n = st.text_input("اسم المريض", value="مريض", key="rep_name")
+    imgs = {}
+    if st.session_state.get("last_analysis_image"):
+        imgs["تحليل الوجه 468"] = st.session_state.last_analysis_image
+    if st.session_state.get("last_golden_image"):
+        imgs["النسبة الذهبية"] = st.session_state.last_golden_image
+    if st.session_state.get("last_cephalometric_image"):
+        imgs["تحليل الأشعة"] = st.session_state.last_cephalometric_image
+    if st.session_state.get("last_dsd_image"):
+        imgs["تصميم DSD"] = st.session_state.last_dsd_image
+    st.info(f"📊 الصور المتوفرة في التقرير: {len(imgs)}")
+    if st.button("📄 توليد التقرير", type="primary", use_container_width=True, key="btn_rep"):
+        if imgs:
+            html = '<html dir="rtl"><head><meta charset="UTF-8"><title>تقرير DENTAL AI OS</title><style>body{font-family:Tajawal,sans-serif;padding:20px;background:#f5f5f5}.c{max-width:900px;margin:auto;background:white;padding:30px;border-radius:10px}h1{color:#00d4ff;text-align:center}</style></head><body><div class="c"><h1>🦷 تقرير DENTAL AI OS</h1>'
+            html += f'<p><b>المريض:</b> {n}</p><p><b>التاريخ:</b> {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>'
+            for t, i in imgs.items():
+                if isinstance(i, Image.Image):
+                    html += f'<h3>{t}</h3><img src="data:image/png;base64,{img_to_b64(i)}" style="max-width:100%;border-radius:8px;">'
+            html += '</div></body></html>'
+            st.download_button("⬇️ تحميل التقرير HTML", html.encode('utf-8'),
+                             "report.html", "text/html", use_container_width=True, key="dl_rep")
+            st.success("✅ تم توليد التقرير")
+        else:
+            st.warning("⚠️ لا توجد صور. قم بتحليل صورة أولاً")
+
+
+def page_settings():
+    st.markdown('<div class="section-title">⚙️ الإعدادات</div>', unsafe_allow_html=True)
+    st.markdown("### 🔧 حالة الأنظمة")
+    c1, c2 = st.columns(2)
+    with c1:
+        if MEDIAPIPE_AVAILABLE:
+            st.success("✅ MediaPipe: متاح")
+        else:
+            st.error("❌ MediaPipe: غير متاح")
+    with c2:
+        if GEMINI_API_KEY:
+            st.success("✅ Gemini AI: جاهز")
+        else:
+            st.warning("⚠️ Gemini AI: غير مُكوّن")
+    st.markdown(f"**OpenCV:** {cv2.__version__}")
+    st.markdown(f"**عدد الأقسام:** 40+")
+    st.markdown("### 🔗 روابط مهمة")
+    st.markdown("- [Gemini API Key](https://aistudio.google.com/app/apikey)")
+    st.markdown("- [Meshy AI](https://www.meshy.ai)")
+    st.markdown("- [Blender](https://www.blender.org)")
+
+
+def page_naqai():
+    st.markdown('<div class="section-title">🤖 NaqAI — مساعدك الذكي</div>', unsafe_allow_html=True)
+    if not GEMINI_API_KEY:
+        st.warning("⚠️ لم يتم تكوين Gemini AI")
+        st.info("""
+        **للحصول على مفتاح مجاني:**
+        1. اذهب إلى: https://aistudio.google.com/app/apikey
+        2. اضغط Create API key
+        3. انسخ المفتاح
+        4. Streamlit Cloud → Settings → Secrets
+        5. أضف: GEMINI_API_KEY = "AIzaSy..."
+        6. Reboot app
+        """)
+        return
+    for msg in st.session_state.naqai_chat:
+        cls = "ai-msg" if msg["role"] == "ai" else "user-msg"
+        icon = "🤖" if msg["role"] == "ai" else "👤"
+        st.markdown(f'<div class="{cls}">{icon} {msg["text"]}</div>', unsafe_allow_html=True)
+    st.markdown("##### 💡 أسئلة سريعة")
+    examples = ["ما هي أفضل زركونيا؟", "كيف أعالج ابتسامة لثوية؟", "نصائح لتبييض الأسنان", "فينير أم تاج؟"]
+    cols = st.columns(4)
+    for i, ex in enumerate(examples):
+        with cols[i]:
+            if st.button(ex, key=f"ex_{i}", use_container_width=True):
+                st.session_state.naqai_chat.append({"role": "user", "text": ex})
+                st.rerun()
+    with st.form("naq_form", clear_on_submit=True):
+        q = st.text_input("اسأل NaqAI...")
+        if st.form_submit_button("📨 إرسال") and q:
+            st.session_state.naqai_chat.append({"role": "user", "text": q})
+            st.rerun()
+    if st.session_state.naqai_chat and st.session_state.naqai_chat[-1]["role"] == "user":
+        with st.spinner("🤖 يفكر..."):
+            ans = ask_gemini(st.session_state.naqai_chat[-1]["text"])
+            st.session_state.naqai_chat.append({"role": "ai", "text": ans})
+            st.rerun()
+    if st.button("🗑️ مسح المحادثة", key="clear_naq"):
+        st.session_state.naqai_chat = []
+        st.rerun()
+
+
+def page_smart_diagnosis():
+    st.markdown('<div class="section-title">🩺 التشخيص الذكي AI</div>', unsafe_allow_html=True)
+    img = image_upload_section("sd", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة للبدء")
+        return
+    st.image(img, use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🧠 تحليل محلي", type="primary", use_container_width=True, key="btn_sd_local"):
+            if MEDIAPIPE_AVAILABLE:
+                lm, ann, data = analyze_face_468(img)
+                if lm is not None:
+                    st.image(ann, use_container_width=True)
+                    if data:
+                        st.json(data)
+    with c2:
+        if GEMINI_API_KEY and st.button("🤖 تحليل AI متقدم", use_container_width=True, key="btn_sd_ai"):
+            with st.spinner("🤖 AI يحلل الصورة..."):
+                ans = ai_analyze_image(img, "قدم تشخيصاً أولياً شاملاً: الأسنان، اللثة، الابتسامة، التوصيات")
+            st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+
+
+def page_dentbook():
+    st.markdown('<div class="section-title">📱 Dentbook — الشبكة الاجتماعية</div>', unsafe_allow_html=True)
+    user = st.session_state.current_user
+    if user is None:
+        return
+    tab1, tab2 = st.tabs(["📝 نشر جديد", "📰 الأخبار"])
+    with tab1:
+        with st.form("db_form", clear_on_submit=True):
+            content = st.text_area("ماذا تريد أن تشارك؟", height=100)
+            if st.form_submit_button("🚀 نشر", use_container_width=True):
+                if content.strip():
+                    st.session_state.dentbook_posts.insert(0, {
+                        "author": user["name"],
+                        "content": content,
+                        "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    })
+                    st.success("✅ تم النشر")
+                    st.rerun()
+    with tab2:
+        if not st.session_state.dentbook_posts:
+            st.info("📭 لا توجد منشورات")
+        for p in st.session_state.dentbook_posts:
+            st.markdown(f'<div class="post-card"><strong style="color:#00d4ff;">{p["author"]}</strong> — {p["time"]}<p style="color:#e2e8f0;">{p["content"]}</p></div>', unsafe_allow_html=True)
+
+
+def page_profile():
+    st.markdown('<div class="section-title">👤 الملف الشخصي</div>', unsafe_allow_html=True)
+    u = st.session_state.current_user
+    if u is None:
+        return
+    with st.form("profile_form"):
+        n = st.text_input("الاسم", value=u.get("name", ""))
+        s = st.text_input("التخصص", value=u.get("specialty", ""))
+        c = st.text_input("الدولة", value=u.get("country", ""))
+        p = st.text_input("الهاتف", value=u.get("phone", ""))
+        b = st.text_area("نبذة", value=u.get("bio", ""))
+        if st.form_submit_button("💾 حفظ", use_container_width=True):
+            st.session_state.current_user.update({
+                "name": n, "specialty": s, "country": c, "phone": p, "bio": b
+            })
+            st.session_state.users_db[u["email"]].update(st.session_state.current_user)
+            st.success("✅ تم الحفظ")
+            st.rerun()
+
+
+def page_members():
+    st.markdown('<div class="section-title">👥 الأعضاء</div>', unsafe_allow_html=True)
+    for e, u in st.session_state.users_db.items():
+        st.markdown(f'<div class="card"><strong>{u["name"]}</strong> — {u.get("specialty", "")} — {u.get("email", "")}</div>', unsafe_allow_html=True)
 if __name__ == "__main__":
     main()
