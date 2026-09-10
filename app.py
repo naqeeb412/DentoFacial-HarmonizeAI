@@ -583,5 +583,404 @@ def main():
         return
     st.success("✅ تم تسجيل الدخول! باقي الأقسام ستُضاف في الأجزاء التالية.")
 
+def sidebar_nav():
+    u = st.session_state.current_user
+    if u is None:
+        return
+    with st.sidebar:
+        st.markdown(f"""
+        <div style="text-align:center;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);">
+            {get_logo_html(50)}
+            <div style="font-weight:700;font-size:1.1rem;margin-top:6px;">DENTAL AI OS</div>
+            <div style="font-size:0.7rem;color:#aac4d6;">v7.0 Pro</div>
+        </div>
+        <div style="text-align:center;margin:16px 0;">
+            <div style="font-size:0.85rem;font-weight:600;">{u['name']}</div>
+            <div style="font-size:0.65rem;color:#aac4d6;">{u.get('specialty','')}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        menu_groups = {
+            "الأساسية": [
+                ("🏠 الرئيسية", "home"),
+                ("📊 لوحة التحكم", "dashboard"),
+                ("🏷️ رفع الشعار", "upload_logo"),
+            ],
+            "التحليل والتشخيص": [
+                ("🧠 تحليل الوجه 468", "face_analysis"),
+                ("✨ النسبة الذهبية", "golden_ratio"),
+                ("😊 تحليل الابتسامة", "smile_analysis"),
+                ("🦷 تحليل الإطباق", "occlusion_analysis"),
+                ("💎 تحليل الوجه التجميلي", "facial_aesthetic"),
+                ("🔬 الماسح العلمي", "scientific_scanner"),
+                ("🩻 تحليل الأشعة", "cephalometric"),
+            ],
+            "التصميم (AI + يدوي)": [
+                ("🎨 محاكاة AI", "ai_simulator"),
+                ("🎬 محاكاة قبل/بعد", "before_after_simulation"),
+                ("💎 Photorealism", "photorealism"),
+                ("🧬 استوديو DSD", "dsd_studio"),
+                ("✏️ التصميم اليدوي", "manual_design"),
+                ("🎨 CAD/CAM 3D", "cad_cam"),
+            ],
+            "إدارة المرضى": [
+                ("📁 بيانات المريض", "patient_data"),
+                ("👥 قائمة المرضى", "patients_list"),
+                ("📸 التصوير", "photography"),
+                ("🩻 الأشعة (الأنواع)", "xray_types"),
+                ("📅 المواعيد", "appointments"),
+                ("💰 الحساب", "accounting"),
+            ],
+            "المواد والعلاج": [
+                ("🧪 المواد العلاجية", "materials_guide"),
+                ("📋 خطة العلاج", "treatment_plan"),
+                ("🔄 خط الإنتاج", "pipeline"),
+                ("📊 جداول المقارنات", "comparisons"),
+            ],
+            "الفريق": [
+                ("👥 متعدد التخصصات", "multidisciplinary"),
+                ("🗣️ منتدى النقاشات", "discussion_forum"),
+                ("💬 المراسلات", "messages"),
+                ("🧪 المختبر", "lab_chat"),
+            ],
+            "المنصة والأنظمة": [
+                ("🌍 المنصة العالمية", "global_platform"),
+                ("🔌 الأنظمة المستخدمة", "systems_used"),
+                ("📊 التحليلات", "analytics"),
+            ],
+            "الإدارة": [
+                ("📢 الإعلانات", "ads_management"),
+                ("👑 الاشتراكات", "subscriptions"),
+                ("📄 التقارير", "reports"),
+                ("⚙️ الإعدادات", "settings"),
+            ],
+            "AI والتواصل": [
+                ("🤖 NaqAI", "naqai"),
+                ("🩺 التشخيص AI", "smart_diagnosis"),
+                ("📱 Dentbook", "dentbook"),
+                ("👤 الملف", "profile"),
+                ("👥 الأعضاء", "members"),
+            ],
+        }
+        
+        for group_name, items in menu_groups.items():
+            with st.expander(group_name, expanded=False):
+                for label, key in items:
+                    if st.button(label, key=f"nav_{key}", use_container_width=True):
+                        st.session_state.current_page = key
+                        st.rerun()
+        
+        st.divider()
+        if st.button("🚪 خروج", use_container_width=True, type="primary"):
+            logout()
+
+
+def page_home():
+    st.markdown('<div class="main-header">DENTAL AI OS v7.0</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">منصة متكاملة — 45+ قسم | AI | تصميم يدوي + تلقائي</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if MEDIAPIPE_AVAILABLE:
+            st.success("✅ MediaPipe متاح")
+        else:
+            st.error("❌ MediaPipe غير متاح")
+    with c2:
+        if GEMINI_API_KEY:
+            st.success("✅ NaqAI جاهز")
+        else:
+            st.warning("⚠️ Gemini غير مُكوّن")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown('<div class="metric-card"><div class="metric-value">45+</div><div class="metric-label">قسم</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="metric-card"><div class="metric-value">468</div><div class="metric-label">نقطة</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="metric-card"><div class="metric-value">AI</div><div class="metric-label">Gemini</div></div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown('<div class="metric-card"><div class="metric-value">2x</div><div class="metric-label">يدوي + تلقائي</div></div>', unsafe_allow_html=True)
+
+
+def page_dashboard():
+    st.markdown('<div class="section-title">📊 لوحة التحكم</div>', unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(st.session_state.users_db)}</div><div class="metric-label">الأعضاء</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(st.session_state.dentbook_posts)}</div><div class="metric-label">المنشورات</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(st.session_state.patient_files)}</div><div class="metric-label">المرضى</div></div>', unsafe_allow_html=True)
+    with c4:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(st.session_state.naqai_chat)}</div><div class="metric-label">محادثات AI</div></div>', unsafe_allow_html=True)
+
+
+def page_upload_logo():
+    st.markdown('<div class="section-title">🏷️ رفع الشعار</div>', unsafe_allow_html=True)
+    up = st.file_uploader("اختر صورة", type=["jpg", "jpeg", "png"])
+    if up:
+        img = Image.open(up)
+        st.session_state.system_logo = img_to_b64(img)
+        st.success("✅ تم رفع الشعار")
+        st.image(img, width=150)
+
+
+def page_face_analysis():
+    st.markdown('<div class="section-title">🧠 تحليل الوجه 468 نقطة</div>', unsafe_allow_html=True)
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("MediaPipe غير متاح")
+        return
+    img = image_upload_section("fa", "📸 ارفع صورة الوجه")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("🧠 تحليل 468 نقطة", type="primary", use_container_width=True, key="btn_468"):
+            with st.spinner("⏳..."):
+                lm, ann, data = analyze_face_468(img)
+                if lm is not None:
+                    st.session_state.last_analysis_image = Image.fromarray(ann)
+                    st.session_state.last_analysis_data = data if data else {}
+                    st.rerun()
+                else:
+                    st.error("❌ لم يتم اكتشاف وجه")
+    if st.session_state.get("last_analysis_image"):
+        st.image(st.session_state.last_analysis_image, use_container_width=True)
+        data = st.session_state.last_analysis_data or {}
+        if data:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("📍 النقاط", data.get("num_landmarks", 468))
+            with c2:
+                st.metric("🏆 الدرجة", f"{data.get('overall_score', 0):.1f}%")
+            with c3:
+                st.metric("✅ التقييم", data.get("grade", "-"))
+            with c4:
+                st.metric("👤 الوجه", data.get("face_shape", "-"))
+            chart = pd.DataFrame({
+                "المعيار": ["ذهبية", "تناسق", "أثلاث", "ابتسامة", "عيون"],
+                "النسبة": [data.get('golden_score', 0), data.get('symmetry_score', 0),
+                          data.get('thirds_score', 0), data.get('smile_score', 0),
+                          data.get('eye_symmetry', 0)]
+            })
+            fig = px.bar(chart, x="المعيار", y="النسبة", template="plotly_dark",
+                         color="النسبة", color_continuous_scale=["#ef4444", "#10b981", "#00d4ff"])
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.download_button("⬇️ PNG", img_to_bytes(st.session_state.last_analysis_image),
+                                 "face_468.png", "image/png", use_container_width=True, key="dl_face_png")
+            with c2:
+                st.download_button("⬇️ JSON", json.dumps(data, ensure_ascii=False, indent=2).encode(),
+                                 "analysis.json", "application/json", use_container_width=True, key="dl_face_json")
+            with c3:
+                if GEMINI_API_KEY and st.button("🤖 تحليل AI", use_container_width=True, key="btn_ai_face"):
+                    with st.spinner("🤖..."):
+                        ans = ai_analyze_image(img, "حلل هذه الصورة: التناسق، النسب، التوصيات التجميلية")
+                    st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+
+
+def page_golden_ratio():
+    st.markdown('<div class="section-title">✨ النسبة الذهبية</div>', unsafe_allow_html=True)
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("MediaPipe غير متاح")
+        return
+    img = image_upload_section("gr", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("✨ تحليل النسبة", type="primary", use_container_width=True, key="btn_gr"):
+            lm, _, _ = analyze_face_468(img)
+            if lm:
+                w, h = img.size
+                result, score, ratio = draw_golden_ratio_full(img, lm, w, h)
+                st.session_state.last_golden_image = result
+                st.session_state.last_golden_data = {"score": score, "ratio": ratio}
+                st.rerun()
+    if st.session_state.get("last_golden_image"):
+        st.image(st.session_state.last_golden_image, use_container_width=True)
+        data = st.session_state.last_golden_data or {}
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("📐 النسبة", f"{data.get('ratio', 0):.3f}")
+        with c2:
+            st.metric("🎯 المثالية", "1.618")
+        with c3:
+            st.metric("🏆 الدرجة", f"{data.get('score', 0):.1f}%")
+        st.download_button("⬇️ تحميل", img_to_bytes(st.session_state.last_golden_image),
+                         "golden.png", "image/png", use_container_width=True, key="dl_golden")
+
+
+def page_smile_analysis():
+    st.markdown('<div class="section-title">😊 تحليل الابتسامة</div>', unsafe_allow_html=True)
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("MediaPipe غير متاح")
+        return
+    img = image_upload_section("sa", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("😊 تحليل", type="primary", use_container_width=True, key="btn_sa"):
+            lm, _, _ = analyze_face_468(img)
+            if lm:
+                w, h = img.size
+                ann_img = np.array(img).copy()
+                for idx in [61, 291, 13, 14]:
+                    try:
+                        x, y = get_landmark_xy(lm, idx, w, h)
+                        cv2.circle(ann_img, (x, y), 5, (255, 100, 200), -1)
+                    except:
+                        pass
+                st.session_state.last_smile_analysis_image = Image.fromarray(ann_img)
+                st.rerun()
+    if st.session_state.get("last_smile_analysis_image"):
+        st.image(st.session_state.last_smile_analysis_image, use_container_width=True)
+
+
+def page_occlusion_analysis():
+    st.markdown('<div class="section-title">🦷 تحليل الإطباق</div>', unsafe_allow_html=True)
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("MediaPipe غير متاح")
+        return
+    img = image_upload_section("occ", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("🦷 تحليل الإطباق", type="primary", use_container_width=True, key="btn_occ"):
+            lm, _, _ = analyze_face_468(img)
+            if lm:
+                w, h = img.size
+                data = analyze_occlusion(lm, w, h)
+                st.session_state.last_occlusion_data = data
+                st.rerun()
+    if st.session_state.get("last_occlusion_data"):
+        data = st.session_state.last_occlusion_data
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("📐 Angle", data.get("angle_class", "-"))
+        with c2:
+            st.metric("↔️ Overjet", f"{data.get('overjet', 0):.1f}mm")
+        with c3:
+            st.metric("↕️ Overbite", f"{data.get('overbite', 0):.1f}mm")
+        st.info(f"💡 {data.get('recommendation', '-')}")
+
+
+def page_facial_aesthetic():
+    st.markdown('<div class="section-title">💎 تحليل الوجه التجميلي</div>', unsafe_allow_html=True)
+    if not MEDIAPIPE_AVAILABLE:
+        st.error("MediaPipe غير متاح")
+        return
+    img = image_upload_section("faes", "📸 ارفع صورة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("💎 تحليل تجميلي", type="primary", use_container_width=True, key="btn_faes"):
+            lm, _, _ = analyze_face_468(img)
+            if lm:
+                w, h = img.size
+                data = analyze_facial_aesthetic(lm, w, h)
+                st.session_state.last_facial_aesthetic_data = data
+                st.rerun()
+    if st.session_state.get("last_facial_aesthetic_data"):
+        data = st.session_state.last_facial_aesthetic_data
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("📐 Nasolabial", f"{data.get('nasolabial_angle', 0):.1f}°")
+        with c2:
+            st.metric("📐 Mentolabial", f"{data.get('mentolabial_angle', 0):.1f}°")
+        with c3:
+            st.metric("🏆 التقييم", data.get("grade", "-"))
+
+
+def page_scientific_scanner():
+    st.markdown('<div class="section-title">🔬 الماسح العلمي الذكي</div>', unsafe_allow_html=True)
+    img = image_upload_section("sci", "📸 صورة شاملة")
+    if img is None:
+        st.info("👆 ارفع صورة")
+        return
+    st.image(img, use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        scan_btn = st.button("🔬 ابدأ المسح الشامل", type="primary", use_container_width=True, key="btn_sci")
+    with c2:
+        ai_btn = st.button("🤖 مسح + تحليل AI", use_container_width=True, key="btn_sci_ai")
+    if scan_btn:
+        with st.spinner("🔬..."):
+            results = {}
+            if MEDIAPIPE_AVAILABLE:
+                lm, ann, fa = analyze_face_468(img)
+                if lm:
+                    w, h = img.size
+                    results["facial"] = fa
+                    results["occlusion"] = analyze_occlusion(lm, w, h)
+                    results["aesthetic"] = analyze_facial_aesthetic(lm, w, h)
+                    results["image"] = Image.fromarray(ann)
+                    st.session_state.scientific_scans.append({"time": datetime.now().strftime("%H:%M"), "results": results})
+                    st.rerun()
+    if ai_btn and GEMINI_API_KEY:
+        with st.spinner("🤖 AI يحلل..."):
+            ans = ai_analyze_image(img, "قدم تقريراً شاملاً: تحليل الأسنان، الابتسامة، الوجه، والتوصيات")
+        st.markdown(f'<div class="ai-msg">🤖 {ans}</div>', unsafe_allow_html=True)
+    if st.session_state.get("scientific_scans"):
+        latest = st.session_state.scientific_scans[-1]
+        res = latest["results"]
+        if "image" in res:
+            st.image(res["image"], use_container_width=True)
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("🧠 الوجه", f"{res.get('facial', {}).get('overall_score', 0):.1f}%")
+        with c2:
+            st.metric("🦷 الإطباق", res.get('occlusion', {}).get('angle_class', '-'))
+        with c3:
+            st.metric("💎 الجمالية", f"{res.get('aesthetic', {}).get('aesthetic_score', 0):.1f}%")
+
+
+def page_cephalometric():
+    st.markdown('<div class="section-title">🩻 تحليل الأشعة</div>', unsafe_allow_html=True)
+    img = image_upload_section("ceph", "📸 صورة الأشعة")
+    if img is None:
+        st.info("👆 ارفع صورة الأشعة")
+        return
+    c1, c2 = st.columns(2)
+    with c1:
+        st.image(img, use_container_width=True)
+    with c2:
+        if st.button("🧠 تحليل", type="primary", use_container_width=True, key="btn_ceph"):
+            with st.spinner("⏳..."):
+                a = cephalometric_analysis(img)
+                st.session_state.last_cephalometric_image = a["analysis_image"]
+                st.session_state.last_cephalometric_data = a
+                st.rerun()
+    if st.session_state.get("last_cephalometric_image"):
+        st.image(st.session_state.last_cephalometric_image, use_container_width=True)
+        a = st.session_state.last_cephalometric_data or {}
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("SNA", f"{a.get('SNA', 0):.1f}°")
+            st.metric("SNB", f"{a.get('SNB', 0):.1f}°")
+        with c2:
+            st.metric("ANB", f"{a.get('ANB', 0):.1f}°")
+            st.metric("SN-MP", f"{a.get('SN-MP', 0):.1f}°")
+        with c3:
+            st.metric("FMA", f"{a.get('FMA', 0):.1f}°")
+            st.metric("IMPA", f"{a.get('IMPA', 0):.1f}°")
 if __name__ == "__main__":
     main()
