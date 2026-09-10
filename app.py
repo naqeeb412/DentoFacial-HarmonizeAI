@@ -1826,5 +1826,97 @@ def page_members():
     st.markdown('<div class="section-title">👥 الأعضاء</div>', unsafe_allow_html=True)
     for e, u in st.session_state.users_db.items():
         st.markdown(f'<div class="card"><strong>{u["name"]}</strong> — {u.get("specialty", "")} — {u.get("email", "")}</div>', unsafe_allow_html=True)
+     
+# ============================================================
+# PAGES ROUTER - قاموس الأقسام
+# ============================================================
+
+PAGES = {
+    "home": page_home,
+    "dashboard": page_dashboard,
+    "upload_logo": page_upload_logo,
+    "face_analysis": page_face_analysis,
+    "golden_ratio": page_golden_ratio,
+    "smile_analysis": page_smile_analysis,
+    "occlusion_analysis": page_occlusion_analysis,
+    "facial_aesthetic": page_facial_aesthetic,
+    "scientific_scanner": page_scientific_scanner,
+    "cephalometric": page_cephalometric,
+    "ai_simulator": page_ai_simulator,
+    "before_after_simulation": page_before_after_simulation,
+    "photorealism": page_photorealism,
+    "dsd_studio": page_dsd_studio,
+    "manual_design": page_manual_design,
+    "cad_cam": page_cad_cam,
+    "patient_data": page_patient_data,
+    "patients_list": page_patients_list,
+    "photography": page_photography,
+    "xray_types": page_xray_types,
+    "appointments": page_appointments,
+    "accounting": page_accounting,
+    "materials_guide": page_materials_guide,
+    "treatment_plan": page_treatment_plan,
+    "pipeline": page_pipeline,
+    "comparisons": page_comparisons,
+    "multidisciplinary": page_multidisciplinary,
+    "discussion_forum": page_discussion_forum,
+    "messages": page_messages,
+    "lab_chat": page_lab_chat,
+    "global_platform": page_global_platform,
+    "systems_used": page_systems_used,
+    "analytics": page_analytics,
+    "ads_management": page_ads_management,
+    "subscriptions": page_subscriptions,
+    "reports": page_reports,
+    "settings": page_settings,
+    "naqai": page_naqai,
+    "smart_diagnosis": page_smart_diagnosis,
+    "dentbook": page_dentbook,
+    "profile": page_profile,
+    "members": page_members,
+}
+
+
+# ============================================================
+# MAIN - الدالة الرئيسية
+# ============================================================
+
+def main():
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "home"
+    
+    if not st.session_state.authenticated:
+        auth_page()
+        return
+    
+    if st.session_state.current_user is None:
+        st.session_state.authenticated = False
+        st.rerun()
+        return
+    
+    try:
+        sidebar_nav()
+        page_func = PAGES.get(st.session_state.current_page)
+        if page_func is None:
+            st.warning(f"الصفحة '{st.session_state.current_page}' غير موجودة")
+            page_func = page_home
+        page_func()
+    except Exception as e:
+        st.error(f"خطأ: {str(e)}")
+        with st.expander("📋 التفاصيل الكاملة"):
+            st.exception(e)
+        if st.button("🏠 العودة للرئيسية"):
+            st.session_state.current_page = "home"
+            st.rerun()
+    
+    st.markdown("""
+    <hr style="margin-top:40px;border-color:#334155;">
+    <div style="text-align:center;color:#64748b;font-size:0.8rem;padding:20px;">
+        <strong style="color:#00d4ff;">DENTAL AI OS v7.0 Pro</strong><br>
+        40+ قسم متكامل | AI | Naqeeb412 Synergy<br>
+        © 2026 جميع الحقوق محفوظة.
+    </div>
+    """, unsafe_allow_html=True)
+
 if __name__ == "__main__":
     main()
