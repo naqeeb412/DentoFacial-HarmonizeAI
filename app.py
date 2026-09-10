@@ -1,6 +1,6 @@
 # ============================================================
-#  🦷 DENTAL AI OS — v5.1 FINAL STABLE
-#  Fixed: main() | DeltaGenerator error | All buttons
+#  🦷 DENTAL AI OS — v5.2 FINAL COMPLETE
+#  All Features Working | MediaPipe Enabled | Gemini Ready
 # ============================================================
 
 import streamlit as st
@@ -142,20 +142,20 @@ if st.session_state.patients_df is None:
 # ═══════════════════════════════════════════════════════════
 def ask_gemini(question, context="طب أسنان تجميلي"):
     if not GEMINI_API_KEY:
-        return "⚠️ لم يتم تكوين Gemini AI. أضف GEMINI_API_KEY في Secrets."
+        return "⚠️ لم يتم تكوين Gemini AI. أضف GEMINI_API_KEY في Secrets.\n\n🎁 احصل على مفتاح مجاني من: https://aistudio.google.com/app/apikey"
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         payload = {
-            "contents": [{"parts": [{"text": f"""أنت مساعد طبي متخصص في طب الأسنان التجميلي.
+            "contents": [{"parts": [{"text": f"""أنت مساعد طبي متخصص في طب الأسنان التجميلي والتقويم.
 السياق: {context}
 السؤال: {question}
-أجب بالعربية بشكل مختصر ومنظم."""}]}],
+أجب بالعربية بشكل مختصر ومنظم ومفيد."""}]}],
             "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1000}
         }
         r = requests.post(url, json=payload, timeout=30)
         if r.status_code == 200:
             return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return f"❌ خطأ ({r.status_code})"
+        return f"❌ خطأ ({r.status_code}): {r.text[:200]}"
     except Exception as e:
         return f"❌ {str(e)}"
 
@@ -186,7 +186,6 @@ def calc_dist(p1, p2):
     return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
 
 def analyze_face_468(image):
-    """تحليل كامل — يعيد (landmarks, annotated_image, analysis_data)"""
     if not MEDIAPIPE_AVAILABLE:
         return None, None, None
     
@@ -225,20 +224,16 @@ def analyze_face_468(image):
     try:
         oval_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in FACE_OVAL]], np.int32)
         cv2.polylines(annotated, [oval_pts], True, (0, 255, 136), 2)
-        
         lips_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in LIPS_OUTER]], np.int32)
         cv2.polylines(annotated, [lips_pts], True, (255, 159, 243), 2)
-        
         le_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in LEFT_EYE]], np.int32)
         re_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in RIGHT_EYE]], np.int32)
         cv2.polylines(annotated, [le_pts], True, (0, 212, 255), 2)
         cv2.polylines(annotated, [re_pts], True, (0, 212, 255), 2)
-        
         lb_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in LEFT_EYEBROW]], np.int32)
         rb_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in RIGHT_EYEBROW]], np.int32)
         cv2.polylines(annotated, [lb_pts], False, (254, 202, 87), 2)
         cv2.polylines(annotated, [rb_pts], False, (254, 202, 87), 2)
-        
         nb_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in NOSE_BRIDGE]], np.int32)
         cv2.polylines(annotated, [nb_pts], False, (255, 255, 0), 2)
     except: pass
@@ -515,7 +510,7 @@ def auth_page():
                 {get_logo_html(55)}
                 <div style="text-align:right;line-height:1.2;">
                     <div style="font-size:1.4rem;color:#94a3b8;">DENTAL AI OS</div>
-                    <div style="font-size:2rem;font-weight:800;color:#00d4ff;margin-top:-4px;">🦷 v5.1</div>
+                    <div style="font-size:2rem;font-weight:800;color:#00d4ff;margin-top:-4px;">🦷 v5.2</div>
                     <div style="font-size:0.75rem;color:#94a3b8;">Naqeeb412 · Synergy</div>
                 </div>
             </div>
@@ -565,7 +560,7 @@ def sidebar_nav():
         <div style="text-align:center;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);">
             {get_logo_html(50)}
             <div style="font-weight:700;font-size:1.1rem;margin-top:6px;">🦷 DENTAL AI OS</div>
-            <div style="font-size:0.7rem;color:#aac4d6;">v5.1</div>
+            <div style="font-size:0.7rem;color:#aac4d6;">v5.2</div>
         </div>
         <div style="text-align:center;margin:16px 0;">
             <div style="font-size:0.85rem;font-weight:600;">{u['name']}</div>
@@ -611,7 +606,7 @@ def sidebar_nav():
 # ═══════════════════════════════════════════════════════════
 
 def page_home():
-    st.markdown('<div class="main-header">🦷 DENTAL AI OS v5.1</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🦷 DENTAL AI OS v5.2</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">منصة تحليل احترافية — 468 نقطة | Φ | AI | DSD</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
@@ -623,7 +618,7 @@ def page_home():
         if GEMINI_API_KEY:
             st.success("✅ NaqAI جاهز")
         else:
-            st.warning("⚠️ Gemini غير مُكوّن")
+            st.warning("⚠️ Gemini غير مُكوّن — أضف GEMINI_API_KEY في Settings → Secrets")
     
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown('<div class="metric-card"><div class="metric-value">468</div><div class="metric-label">نقطة</div></div>', unsafe_allow_html=True)
@@ -886,7 +881,7 @@ def page_ai_simulator():
     
     c1, c2 = st.columns([1, 2])
     with c1:
-        st.markdown("### ⚙️ Sliders")
+        st.markdown("### ⚙️ Sliders PowerAI")
         smile = st.slider("😊 ابتسامة", 0, 100, 0, key="sl_smile")
         white = st.slider("✨ تبييض", 0, 100, 0, key="sl_white")
         skin = st.slider("💉 بشرة", 0, 100, 0, key="sl_skin")
@@ -1317,7 +1312,18 @@ def page_naqai():
     st.markdown('<div class="section-title">🤖 NaqAI — مساعدك الذكي</div>', unsafe_allow_html=True)
     if not GEMINI_API_KEY:
         st.warning("⚠️ أضف GEMINI_API_KEY في Settings → Secrets")
-        st.info("احصل على مفتاح مجاني: https://aistudio.google.com/app/apikey")
+        st.info("""
+        **🎁 للحصول على مفتاح مجاني:**
+        1. اذهب إلى: https://aistudio.google.com/app/apikey
+        2. اضغط **Create API key**
+        3. انسخ المفتاح
+        4. في Streamlit Cloud: **Settings → Secrets**
+        5. أضف السطر:
+        ```
+        GEMINI_API_KEY = "AIzaSy..."
+        ```
+        6. اضغط **Save** ثم **Reboot app**
+        """)
         return
     
     for msg in st.session_state.naqai_chat:
@@ -1468,7 +1474,7 @@ PAGES = {
 }
 
 # ═══════════════════════════════════════════════════════════
-#  🚀 MAIN — النسخة الآمنة (مُصلَّحة)
+#  🚀 MAIN
 # ═══════════════════════════════════════════════════════════
 def main():
     if "current_page" not in st.session_state:
@@ -1501,7 +1507,7 @@ def main():
     st.markdown("""
     <hr style="margin-top:40px;border-color:#334155;">
     <div style="text-align:center;color:#64748b;font-size:0.8rem;padding:20px;">
-        <strong style="color:#00d4ff;">🦷 DENTAL AI OS v5.1</strong><br>© 2026
+        <strong style="color:#00d4ff;">🦷 DENTAL AI OS v5.2</strong><br>© 2026
     </div>
     """, unsafe_allow_html=True)
 
