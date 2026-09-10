@@ -216,111 +216,229 @@ def calc_dist(p1, p2):
     return math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)
 
 def analyze_face_468(image):
+def page_face_analysis():
+    st.markdown('<div class="section-title">🧠 تحليل الوجه 468 نقطة</div>', unsafe_allow_html=True)
+    st.caption("رسم كامل لـ 468 نقطة تشريحية + قياسات + تحليل AI")
+    
     if not MEDIAPIPE_AVAILABLE:
-        return None, None, None
-    img_np = np.array(image.convert('RGB'))
-    h, w = img_np.shape[:2]
-    fm = get_face_mesh()
-    if fm is None:
-        return None, None, None
+        st.error("❌ MediaPipe غير متاح — لا يمكن إجراء التحليل")
+        return
+    
+    # ═══ رفع الصورة ═══
+    up = st.file_uploader("📸 ارفع صورة الوجه (JPG / PNG)", 
+                          type=["jpg", "png", "jpeg"], 
+                          key="fa_uploader_v2")
+    
+    if up is None:
+        st.info("👆 ارفع صورة لبدء التحليل")
+        return
+    
+    # ═══ قراءة الصورة ═══
     try:
-        with fm as face_mesh:
-            results = face_mesh.process(cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR))
-    except Exception:
-        return None, None, None
-    if not results.multi_face_landmarks:
-        return None, None, None
-    landmarks = results.multi_face_landmarks[0]
-    annotated = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR).copy()
-    for idx in range(min(468, len(landmarks.landmark))):
-        try:
-            x, y = get_landmark_xy(landmarks, idx, w, h)
-            cv2.circle(annotated, (x, y), 1, (0, 212, 255), -1)
-        except:
-            pass
-    for idx in [NOSE_TIP, CHIN, FOREHEAD, 61, 291, 33, 263, 152, 234, 454]:
-        try:
-            x, y = get_landmark_xy(landmarks, idx, w, h)
-            cv2.circle(annotated, (x, y), 5, (255, 0, 100), -1)
-        except:
-            pass
-    try:
-        oval_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in FACE_OVAL]], np.int32)
-        cv2.polylines(annotated, [oval_pts], True, (0, 255, 136), 2)
-        lips_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in LIPS_OUTER]], np.int32)
-        cv2.polylines(annotated, [lips_pts], True, (255, 159, 243), 2)
-        le_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in LEFT_EYE]], np.int32)
-        re_pts = np.array([[get_landmark_xy(landmarks, i, w, h) for i in RIGHT_EYE]], np.int32)
-        cv2.polylines(annotated, [le_pts], True, (0, 212, 255), 2)
-        cv2.polylines(annotated, [re_pts], True, (0, 212, 255), 2)
-    except:
-        pass
-    try:
-        ll = get_landmark_xy(landmarks, 61, w, h)
-        lr = get_landmark_xy(landmarks, 291, w, h)
-        nl = get_landmark_xy(landmarks, 102, w, h)
-        nr = get_landmark_xy(landmarks, 331, w, h)
-        lips_w = calc_dist(ll, lr)
-        nose_w = calc_dist(nl, nr)
-        phi_ratio = lips_w / nose_w if nose_w > 0 else 0
-        phi_dev = abs(phi_ratio - PHI) / PHI
-        golden_score = max(0, min(100, (1 - phi_dev) * 100))
-        left_eye_c = get_landmark_xy(landmarks, 33, w, h)
-        right_eye_c = get_landmark_xy(landmarks, 263, w, h)
-        nose_c = get_landmark_xy(landmarks, NOSE_TIP, w, h)
-        chin_c = get_landmark_xy(landmarks, CHIN, w, h)
-        eye_center_x = (left_eye_c[0] + right_eye_c[0]) / 2
-        face_width = calc_dist(get_landmark_xy(landmarks, LEFT_CHEEK, w, h),
-                                get_landmark_xy(landmarks, RIGHT_CHEEK, w, h))
-        symmetry_score = max(0, 100 - (abs(nose_c[0] - eye_center_x) / face_width * 200)) if face_width > 0 else 0
-        face_height = calc_dist(get_landmark_xy(landmarks, FOREHEAD, w, h), chin_c)
-        fw_h_ratio = face_width / face_height if face_height > 0 else 0
-        if fw_h_ratio < 0.65:
-            face_shape = "مستطيل"
-        elif fw_h_ratio < 0.75:
-            face_shape = "بيضاوي"
-        elif fw_h_ratio < 0.85:
-            face_shape = "دائري"
-        else:
-            face_shape = "مربع"
-        ltop = get_landmark_xy(landmarks, 13, w, h)
-        lbot = get_landmark_xy(landmarks, 14, w, h)
-        lips_h = calc_dist(ltop, lbot)
-        smile_score = min(100, (lips_w / lips_h / 3.5) * 100) if lips_h > 0 else 0
-        thirds_score = 75 + random.uniform(0, 20)
-        eye_sym = 85 + random.uniform(0, 12)
-        overall = (golden_score + symmetry_score + thirds_score + smile_score + eye_sym) / 5
-        if overall > 85:
-            grade = "A+ (ممتاز)"
-        elif overall > 75:
-            grade = "A (جيد جداً)"
-        elif overall > 60:
-            grade = "B (جيد)"
-        elif overall > 45:
-            grade = "C (مقبول)"
-        else:
-            grade = "D (يحتاج تحسين)"
-        cv2.line(annotated, ll, lr, (255, 215, 0), 2)
-        cv2.line(annotated, nl, nr, (255, 215, 0), 2)
-        cv2.putText(annotated, f"Overall: {overall:.1f}%", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(annotated, f"Phi: {phi_ratio:.3f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 215, 0), 2)
-        cv2.putText(annotated, f"Face: {face_shape}", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 212, 255), 2)
-        analysis = {
-            "num_landmarks": len(landmarks.landmark),
-            "golden_ratio": phi_ratio,
-            "golden_score": golden_score,
-            "symmetry_score": symmetry_score,
-            "thirds_score": thirds_score,
-            "smile_score": smile_score,
-            "eye_symmetry": eye_sym,
-            "face_shape": face_shape,
-            "overall_score": overall,
-            "grade": grade,
-        }
-        return landmarks, cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB), analysis
+        current_img = Image.open(up).convert('RGB')
+        st.session_state["fa_current_img"] = current_img
     except Exception as e:
-        return landmarks, cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB), {"error": str(e)}
+        st.error(f"❌ خطأ في قراءة الصورة: {e}")
+        return
+    
+    # ═══ عرض الصورة + زر التحليل ═══
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 📷 الصورة الأصلية")
+        st.image(current_img, use_container_width=True)
+    
+    with c2:
+        st.markdown("##### ⚙️ التحليل")
+        st.write("")
+        st.write("")
+        # ✅ الزر الرئيسي - واضح وكبير
+        analyze_btn = st.button(
+            "🧠 ابدأ تحليل 468 نقطة", 
+            type="primary", 
+            use_container_width=True, 
+            key="btn_analyze_468_v2"
+        )
+        st.write("")
+        st.write("")
+        # ✅ زر إضافي للتحليل بالذكاء الاصطناعي
+        if GEMINI_API_KEY:
+            ai_btn = st.button(
+                "🤖 تحليل بالذكاء الاصطناعي", 
+                use_container_width=True, 
+                key="btn_ai_468_v2"
+            )
+        else:
+            ai_btn = False
+            st.info("💡 أضف GEMINI_API_KEY لتفعيل تحليل AI")
+    
+    # ═══ تنفيذ التحليل المحلي ═══
+    if analyze_btn:
+        with st.spinner("⏳ جاري تحليل 468 نقطة..."):
+            landmarks, annotated, data = analyze_face_468(current_img)
+            if landmarks is not None and annotated is not None:
+                st.session_state["fa_annotated"] = Image.fromarray(annotated)
+                st.session_state["fa_data"] = data if data else {}
+                st.success("✅ تم التحليل بنجاح!")
+                st.rerun()
+            else:
+                st.error("❌ لم يتم اكتشاف وجه في الصورة — تأكد من:")
+                st.markdown("""
+                - الوجه واضح ومضاء جيداً
+                - الوجه في منتصف الصورة
+                - الصورة بصيغة JPG أو PNG
+                """)
+    
+    # ═══ تنفيذ التحليل بالذكاء الاصطناعي ═══
+    if ai_btn:
+        with st.spinner("🤖 الذكاء الاصطناعي يحلل الصورة..."):
+            ans = ai_analyze_image(
+                current_img, 
+                "حلل هذه الصورة الطبية: صف الأسنان، الابتسامة، تناسق الوجه، النسب الذهبية، وقدم توصيات تجميلية مفصلة."
+            )
+        st.markdown(f'<div class="ai-msg">🤖 <b>تحليل NaqAI:</b><br><br>{ans}</div>', unsafe_allow_html=True)
+    
+    # ═══ عرض النتائج ═══
+    if st.session_state.get("fa_annotated") is not None:
+        st.markdown("---")
+        st.markdown("### 🎯 الصورة مع الرسم التشريحي الكامل")
+        st.image(st.session_state["fa_annotated"], use_container_width=True)
+        
+        data = st.session_state.get("fa_data", {})
+        
+        if data and "error" not in data:
+            # KPIs رئيسية
+            st.markdown("### 📊 النتائج الرئيسية")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("📍 النقاط المرسومة", data.get("num_landmarks", 468))
+            with c2:
+                st.metric("🏆 الدرجة الكلية", f"{data.get('overall_score', 0):.1f}%")
+            with c3:
+                st.metric("✅ التقييم", data.get("grade", "-"))
+            with c4:
+                st.metric("👤 شكل الوجه", data.get("face_shape", "-"))
+            
+            # القياسات التفصيلية
+            st.markdown("### 📐 القياسات التشريحية")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.metric("✨ النسبة الذهبية Φ", f"{data.get('golden_score', 0):.1f}%")
+                st.metric("📐 نسبة الشفاه/الأنف", f"{data.get('golden_ratio', 0):.3f}", 
+                         help="القيمة المثالية: 1.618")
+                st.metric("📏 تناسق الأثلاث", f"{data.get('thirds_score', 0):.1f}%")
+            with c2:
+                st.metric("🎯 تناسق الوجه", f"{data.get('symmetry_score', 0):.1f}%")
+                st.metric("😁 الابتسامة", f"{data.get('smile_score', 0):.1f}%")
+                st.metric("👁️ تناسق العيون", f"{data.get('eye_symmetry', 0):.1f}%")
+            
+            # مخطط بياني
+            st.markdown("### 📊 مخطط النتائج")
+            chart = pd.DataFrame({
+                "المعيار": ["النسبة الذهبية", "التناسق", "الأثلاث", "الابتسامة", "العيون"],
+                "النسبة %": [
+                    data.get('golden_score', 0),
+                    data.get('symmetry_score', 0),
+                    data.get('thirds_score', 0),
+                    data.get('smile_score', 0),
+                    data.get('eye_symmetry', 0),
+                ]
+            })
+            fig = px.bar(
+                chart, 
+                x="المعيار", 
+                y="النسبة %",
+                color="النسبة %",
+                template="plotly_dark",
+                color_continuous_scale=["#ef4444", "#f59e0b", "#10b981", "#00d4ff"],
+                range_color=[0, 100]
+            )
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',
+                showlegend=False,
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # أزرار التحميل
+            st.markdown("### 💾 التحميل والتقارير")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.download_button(
+                    "⬇️ تحميل الصورة (PNG)",
+                    img_to_bytes(st.session_state["fa_annotated"]),
+                    f"face_468_{datetime.now().strftime('%Y%m%d_%H%M')}.png",
+                    "image/png",
+                    use_container_width=True,
+                    key="dl_468_png_v2"
+                )
+            with c2:
+                st.download_button(
+                    "⬇️ تحميل التقرير (JSON)",
+                    json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8'),
+                    f"analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    "application/json",
+                    use_container_width=True,
+                    key="dl_468_json_v2"
+                )
+            with c3:
+                html = f"""<!DOCTYPE html>
+                <html dir="rtl"><head><meta charset="UTF-8"><title>تقرير تحليل الوجه 468</title>
+                <style>body{{font-family:Tajawal,sans-serif;padding:20px;background:#f5f5f5}}
+                .container{{max-width:900px;margin:auto;background:white;padding:30px;border-radius:10px}}
+                h1{{color:#00d4ff;text-align:center}} table{{width:100%;border-collapse:collapse;margin:20px 0}}
+                td,th{{padding:10px;border:1px solid #ddd;text-align:right}} th{{background:#00d4ff;color:white}}</style>
+                </head><body><div class="container">
+                <h1>🦷 تقرير تحليل الوجه 468 نقطة</h1>
+                <p><b>التاريخ:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+                <img src="data:image/png;base64,{img_to_b64(st.session_state["fa_annotated"])}" 
+                     style="max-width:100%;border-radius:10px;">
+                <h2>📊 النتائج</h2>
+                <table>
+                <tr><th>المعيار</th><th>القيمة</th></tr>
+                <tr><td>الدرجة الكلية</td><td>{data.get('overall_score', 0):.1f}%</td></tr>
+                <tr><td>التقييم</td><td>{data.get('grade', '-')}</td></tr>
+                <tr><td>شكل الوجه</td><td>{data.get('face_shape', '-')}</td></tr>
+                <tr><td>النسبة الذهبية</td><td>{data.get('golden_score', 0):.1f}%</td></tr>
+                <tr><td>التناسق</td><td>{data.get('symmetry_score', 0):.1f}%</td></tr>
+                <tr><td>الأثلاث</td><td>{data.get('thirds_score', 0):.1f}%</td></tr>
+                <tr><td>الابتسامة</td><td>{data.get('smile_score', 0):.1f}%</td></tr>
+                <tr><td>تناسق العيون</td><td>{data.get('eye_symmetry', 0):.1f}%</td></tr>
+                </table></div></body></html>"""
+                st.download_button(
+                    "⬇️ تحميل التقرير (HTML)",
+                    html.encode('utf-8'),
+                    f"report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    "text/html",
+                    use_container_width=True,
+                    key="dl_468_html_v2"
+                )
+            
+            # NaqAI للإجابة على أسئلة
+            if GEMINI_API_KEY:
+                st.markdown("### 🤖 اطلب تحليل من NaqAI")
+                if st.button("🤖 اطلب تحليل AI مفصل", use_container_width=True, key="btn_ai_face_detailed"):
+                    with st.spinner("🤖 NaqAI يحلل النتائج..."):
+                        prompt = f"""حلل النتائج الوجهية التالية:
+- الدرجة الكلية: {data.get('overall_score', 0):.1f}%
+- التقييم: {data.get('grade', '-')}
+- شكل الوجه: {data.get('face_shape', '-')}
+- النسبة الذهبية: {data.get('golden_score', 0):.1f}%
+- نسبة الشفاه/الأنف: {data.get('golden_ratio', 0):.3f}
+- تناسق الوجه: {data.get('symmetry_score', 0):.1f}%
+- تناسق الأثلاث: {data.get('thirds_score', 0):.1f}%
+- الابتسامة: {data.get('smile_score', 0):.1f}%
+- تناسق العيون: {data.get('eye_symmetry', 0):.1f}%
 
+قدم:
+1. تحليل مختصر للحالة
+2. نقاط القوة
+3. الفرص التحسينية
+4. توصيات علاجية محددة"""
+                        ans = ask_gemini(prompt, "تحليل وجهي تجميلي")
+                    st.markdown(f'<div class="ai-msg">🤖 <b>تحليل NaqAI:</b><br><br>{ans}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ لم يتم استخراج القياسات. حاول مرة أخرى بصورة أوضح.")
 def analyze_occlusion(landmarks, w, h):
     try:
         upper_lip = get_landmark_xy(landmarks, 13, w, h)
